@@ -30,317 +30,185 @@ the invalid format below.
 
 Database Schema:
 
-Table: WMS.CountSheetSetup
-RecordId
-TransType 
-TransDoc
-TransLine
-LineNumber
-ItemCode
-ColorCode
-ClassCode
-SizeCode
-PalletID
-BatchNumber
-Location
-ExpirationDate
-MfgDate
-RRdate
-OriginalBulkQty
-OriginalBaseQty
-OriginalLocation
-RemainingBulkQty
-RemainingBaseQty
-PickedBulkQty
-PickedBaseQty
-ReservedBulkQty
-ReservedBaseQty
-OriginalCost
-UnitCost
-Field1
-Field2
-Field3
-Field4
-Field5
-Field6
-Field7
-Field8
-Field9
-RefTransType
-RefTransDoc
-RefTransLine
-RefLineNumber
-AddedBy
-AddedDate
-LastEditedBy
-LastEditedDate
-BarcodeNo
-SubmittedDate
-PutawayDate
-WarehouseCode
-PalletPicking
-ReceivingFindings
-CustomerC
-HoldStatus
-AllocatedQty
-AllocatedKilo
-AllocatedDoc
-BatchComi
-ComiRef
-OriginalTransdoc
-OriginalTransLine
+WMS.CountSheetSetup{
+RecordId=unique id; TransType=txn type; TransDoc=src doc; TransLine=txn line; LineNumber=seq line;
+ItemCode=product; ColorCode=color; ClassCode=class; SizeCode=size; PalletID=pallet; BatchNumber=batch;
+Location=bin; ExpirationDate=expiry; MfgDate=mfg; RRdate=rr date;
+OriginalBulkQty=init bulk; OriginalBaseQty=init base; OriginalLocation=orig bin;
+RemainingBulkQty=curr bulk; RemainingBaseQty=curr base;
+PickedBulkQty=picked bulk; PickedBaseQty=picked base;
+ReservedBulkQty=reserved bulk; ReservedBaseQty=reserved base;
+OriginalCost=recv cost; UnitCost=unit cost;
+Field1-2,4-9=custom; Field3=lot id;
+RefTransType=ref type; RefTransDoc=ref doc; RefTransLine=ref line; RefLineNumber=ref subline;
+AddedBy,AddedDate=created; LastEditedBy,LastEditedDate=modified;
+BarcodeNo=barcode; SubmittedDate=submitted; PutawayDate=putaway;
+WarehouseCode=warehouse; PalletPicking=flag;
+ReceivingFindings=inspection; CustomerC=customer; HoldStatus=hold;
+AllocatedQty=alloc qty; AllocatedKilo=alloc wt; AllocatedDoc=alloc doc;
+BatchComi=batch commingle; ComiRef=commingle ref;
+OriginalTransdoc=orig doc; OriginalTransLine=orig line;
+}
 
+WMS.Inbound{
+DocNumber=doc; CustomerCode=customer; WarehouseCode=warehouse; DocDate=date;
+ICNNumber=icn; TranType=type; Plant=plant; RoomCode=room;
+DRNumber=dr; ContainerTemp=temp; Driver=driver; ContainerNo=container;
+ContactingDept=dept; InvoiceNo=invoice; PlateNo=plate; SealNo=seal;
+Supplier=supplier; AWB=awb; Trucker=trucker;
+DocumentationStaff=doc staff; WarehouseChecker=checker; GuardOnDuty=guard;
+CustomerRepresentative=customer rep; ApprovingOfficer=approver;
+Arrival,Departure,StartUnload,CompleteUnload=datetime;
+PutAwayBy=putaway user; PutAwayDate=putaway; PutAwayStrategy=strategy;
+IsNoCharge=flag; Packing=packing; AssignLoc=zone; ICNTotalQty=total qty;
+AddedBy,AddedDate=created; LastEditedBy,LastEditedDate=modified;
+SubmittedBy,SubmittedDate=submitted; PostedBy,PostedDate=posted;
+IsValidated=flag; IsWithDetail=flag; Field1-9=custom;
+ApprovedBy,ApprovedDate=approved;
+IsPrinted=flag; GeneratedDate=generated; PrintCount=count;
+ProdNumber=prod order; StorageType=temp type;
+IsService,DirectOutbound=flags;
+WeekNo=week; TruckNo=truck; Remarks=notes; UserId=user;
+AcceptBy,AcceptDate=accepted; RejectBy,RejectDate=rejected;
+CheckerAssignedDate=checker assigned;
+RFPutAwayBy,RFPutAwayDate=rf putaway;
+DeliveryDate=delivery; DockingTime=dock;
+CheckingStart,CheckingEnd=checking;
+StartProcessing,EndProcessing=processing;
+HoldReason=reason; HoldRemarks=notes;
+HoldDate,UnHoldDate,HoldDuration=hold;
+HoldStatus=hold; Status=status;
+CheckedBy=checked; InternalExternal=type;
+LoadingBay=bay; AuthorizeBy=authorized;
+DwellTime=vehicle time; DocumentBy=doc;
+CancelledBy,CancelledDate=cancel;
+CompleteUnloadBY=unload by; CheckerTransact=checker;
+BlastReq=flag; TDRnumber=temp report;
+TDocumentedBy,Tdocument,TOrderFullfilment,Tremarks=temp;
+BlastedBy,BlastedDate=blast;
+CleanInvoice=verified; TruckerRepresentative=rep;
+AfterBlastBy,AfterBlastedDate=post blast;
+HandlingInPt=handling; ArrivedBy=arrival;
+ICNPortalCreatedDate,ICNPortalSubmitted=portal;
+ResetBy,ResetDate=reset;
+PutAwayStatus=putaway status;
+UncancelledBy,UncancelledDate=cancel reversal;
+ImportedDate=import;
+NonConformance=flag; NCR=ncr;
+Stripping,Sorting=flags; RowVer=version;
+IsTruckMonitored=monitor flag;
+}
 
-Table: WMS.Inbound
-DocNumber
-CustomerCode
-WarehouseCode
-DocDate
-ICNNumber
-TranType
-Plant
-RoomCode
-DRNumber
-ContainerTemp
-Driver
-ContainerNo
-ContactingDept
-InvoiceNo
-PlateNo
-SealNo
-Supplier
-AWB
-Trucker
-DocumentationStaff
-WarehouseChecker
-GuardOnDuty
-CustomerRepresentative
-ApprovingOfficer
-Arrival
-Departure
-StartUnload
-CompleteUnload
-PutAwayBy
-PutAwayDate
-PutAwayStrategy
-IsNoCharge
-Packing
-AssignLoc
-ICNTotalQty
-AddedBy
-AddedDate
-LastEditedBy
-LastEditedDate
-SubmittedBy
-SubmittedDate
-PostedBy
-PostedDate
-IsValidated
-IsWithDetail
-Field1
-Field2
-Field3
-Field4
-Field5
-Field6
-Field7
-Field8
-Field9
-ApprovedBy
-ApprovedDate
-IsPrinted
-GeneratedDate
-PrintCount
-ProdNumber
-StorageType
-IsService
-DirectOutbound
-WeekNo
-TruckNo
-Remarks
-UserId
-AcceptBy
-AcceptDate
-RejectBy
-RejectDate
-CheckerAssignedDate
-RFPutAwayBy
-RFPutAwayDate
-DeliveryDate
-DockingTime
-CheckingStart
-CheckingEnd
-EndProcessing
-StartProcessing
-HoldReason
-HoldRemarks
-HoldDate
-UnHoldDate
-HoldDuration
-HoldStatus
-Status
-CheckedBy
-InternalExternal
-LoadingBay
-AuthorizeBy
-DwellTime
-DocumentBy
-CancelledBy
-CancelledDate
-CompleteUnloadBY
-CheckerTransact
-BlastReq
-TDRnumber
-TDocumentedBy
-Tdocument
-TOrderFullfilment
-Tremarks
-BlastedBy
-BlastedDate
-CleanInvoice
-TruckerRepresentative
-AfterBlastBy
-AfterBlastedDate
-HandlingInPt
-ArrivedBy
-ICNPortalCreatedDate
-ICNPortalSubmitted
-ResetBy
-ResetDate
-PutAwayStatus
-UncancelledDate
-UncancelledBy
-ImportedDate
-NonConformance
-NCR
-Stripping
-Sorting
-RowVer
-IsTruckMonitored
+WMS.Outbound{
+DocNumber=doc; DocDate=date; WarehouseCode=warehouse; Customer=customer;
+TargetDate=target; IsNoCharge=flag;
+DeliverTo=dest; DeliveryAddress=address;
+TruckingCo=trucker; PlateNumber=plate; Driver=driver;
+WarehouseChecker=checker; DocumentStaff=doc staff;
+StartLoading,CompleteLoading=loading;
+ContainerNumber=container; SealNumber=seal;
+OtherReference=ref;
+AddedBy,AddedDate=created; LastEditedBy,LastEditedDate=modified;
+SubmittedBy,SubmittedDate=submitted; PostedBy,PostedDate=posted;
+IsValidated,IsWithDetail=flags; Field1-9=custom;
+SetBox=boxes; NetWeight=weight; NetVolume=volume;
+SMDeptSub=dept; ModeofPayment=payment; ModeofShipment=shipment;
+Brand=brand; TotalAmount=value; DeclaredValue=declared;
+TotalQty=qty; ForwarderTR=tracking;
+WayBillRemarks=notes; WayBillDate=date;
+IsPrinted=flag; PrintCount=count;
+AllocationDate=allocation; StorageType=temp type;
+AcceptBy,AcceptDate=accepted; RejectBy,RejectDate=rejected;
+CheckerAssignedDate=checker assigned;
+RFCheckBy,RFCheckDate=rf check;
+ArrivalTime,DockingTime=arrival;
+CheckingStart,CheckingEnd=checking;
+StartProcessing,EndProcessing=processing;
+DepartureTime=departure;
+HoldReason,HoldRemarks=hold;
+HoldDate,UnHoldDate,HoldDuration=hold;
+Status=status; HoldStatus=hold;
+CheckedBy=checked; InternalExternal=type;
+LoadingBay=bay; Consignee=consignee;
+Overtime=flag; ConsigneeAddress=address;
+AddtionalManpower=extra manpower; SuppliedBy=supplier;
+NOManpower=count; TruckProviderByMets=provider;
+TrackingNO=tracking; CompanyDept=dept;
+ShipmentType=type; RefDoc=ref;
+TruckType=truck; DwellTime=time;
+ApprovingOfficer=approver; CheckerTransact=checker;
+CancelledBy,CancelledDate=cancel;
+Remarksout=notes;
+TDRnumber,TDocumentedBy,Tdocument,TOrderFullfilment,Tremarks=temp;
+HIHO=flag; CleanInvoice=verified;
+TruckerRepresentative=rep; ArrivedBy=arrival;
+OCNPortalCreatedDate,OCNPortalSubmitted=portal;
+PickToLoad=flag; MTV=transport;
+IsDistri=flag;
+UncancelledBy,UncancelledDate=cancel reversal;
+UncancelledFrom,CancelledFrom=status;
+SONumber=so; OutletHead=outlet;
+Notes=notes; Wave=wave;
+IsLead,IsWave=flags;
+ContainNum=container count;
+}
 
+WMS.InboundDetail{
+DocNumber=parent inbound doc; LineNumber=line;
+ItemCode=product; ColorCode=color; ClassCode=class; SizeCode=size;
+BulkQty=expected bulk; BulkUnit=bulk uom;
+ReceivedQty=actual qty; Unit=base uom;
+ExpiryDate=expiry; BatchNumber=batch/damage; ManufacturingDate=mfg;
+ToLocation=dest bin/lot; PalletID=pallet; LotID=lot;
+RRDocDate=rr date;
+PickedQty=picked; Remarks=notes;
+BaseQty=base qty; StatusCode=code; BarcodeNo=barcode;
+Field1-9=custom;
+Status=status; Strategy=putaway strategy;
+ICNQty=icn qty; PlantCode=plant;
+CheckerPutawayBy,CheckerPutawayDate=putaway verify;
+OriginalLineNumber=orig line; SubLineNumber=subline;
+SpecialHandlingInstruc=handling; Findings=inspection;
+HoldBy,HoldDate=hold;
+BlastedBy,BlastedDate=blast;
+NCRRemarks=ncr notes; BlastOnRF=rf blast;
+AfterBlastBy,AfterBlastedDate=post blast;
+IsPartial=flag; isConfirmed=flag;
+}
 
-Table: WMS.Outbound
-DocNumber
-DocDate
-WarehouseCode
-Customer
-TargetDate
-IsNoCharge
-DeliverTo
-DeliveryAddress
-TruckingCo
-PlateNumber
-Driver
-WarehouseChecker
-DocumentStaff
-StartLoading
-CompleteLoading
-ContainerNumber
-SealNumber
-OtherReference
-AddedBy
-AddedDate
-LastEditedBy
-LastEditedDate
-SubmittedBy
-SubmittedDate
-PostedBy
-PostedDate
-IsValidated
-IsWithDetail
-Field1
-Field2
-Field3
-Field4
-Field5
-Field6
-Field7
-Field8
-Field9
-SetBox
-NetWeight
-NetVolume
-SMDeptSub
-ModeofPayment
-ModeofShipment
-Brand
-TotalAmount
-DeclaredValue
-TotalQty
-ForwarderTR
-WayBillRemarks
-WayBillDate
-IsPrinted
-PrintCount
-AllocationDate
-StorageType
-AcceptBy
-AcceptDate
-RejectBy
-RejectDate
-CheckerAssignedDate
-RFCheckBy
-RFCheckDate
-ArrivalTime
-DockingTime
-CheckingEnd
-CheckingStart
-EndProcessing
-StartProcessing
-DepartureTime
-HoldReason
-HoldRemarks
-HoldDate
-UnHoldDate
-HoldDuration
-Status
-HoldStatus
-CheckedBy
-InternalExternal
-LoadingBay
-Consignee
-Overtime
-ConsigneeAddress
-AddtionalManpower
-SuppliedBy
-NOManpower
-TruckProviderByMets
-TrackingNO
-CompanyDept
-ShipmentType
-RefDoc
-TruckType
-DwellTime
-ApprovingOfficer
-CheckerTransact
-CancelledBy
-CancelledDate
-Remarksout
-TDRnumber
-TDocumentedBy
-Tdocument
-TOrderFullfilment
-Tremarks
-HIHO
-CleanInvoice
-TruckerRepresentative
-ArrivedBy
-OCNPortalCreatedDate
-OCNPortalSubmitted
-PickToLoad
-MTV
-IsDistri
-UncancelledBy
-UncancelledDate
-UncancelledFrom
-CancelledFrom
-SONumber
-OutletHead
-Notes
-Wave
-IsLead
-IsWave
-ContainNum
+WMS.OutboundDetail{
+DocNumber=parent outbound doc; LineNumber=line;
+PicklistNo=picklist; ItemCode=product; ColorCode=color; ClassCode=class; SizeCode=size;
+BulkQty=requested bulk; BulkUnit=bulk uom;
+PicklistQty=assigned; Unit=base uom; BaseQty=base qty;
+StatusCode=code; BarcodeNo=barcode;
+Field1=batch number; Field2-9=custom;
+PickLineNumber=pick line; Price=unit price; Remarks=notes;
+OCNLineNumber=ocn line; OCNSubLineNumber=ocn subline;
+PalletID=source pallet; Location=source bin;
+RFCheckBy,RFCheckDate=rf check;
+ItemReturn=return ref; Customer=customer;
+LastEditedBy,LastEditedDate=modified;
+Lottable02=lot id;
+ReturnBulkQty,ReturnBaseQty=returns;
+Mkfgdate=mfg; ExpiryDate=expiry;
+WarehouseChecker=checker;
+Outlet=outlet; DropNo=drop seq;
+DReport=delivery report;
+SpecialHandling=handling;
+Remarks1,Remarks2=notes;
+RRDocdate=rr date;
+OldQty,OldBulkQty=prev qty;
+OldPalletID=prev pallet; PickedPalletID=actual pallet;
+IsNoChargeDetail=flag;
+PalletCount=count;
+BatchNumb=batch;
+SONum=so;
+OutNotes=notes;
+DRemarks=delivery notes;
+InboundDocNumber=source inbound;
+}
+
 
 
 Output Format:
@@ -443,10 +311,6 @@ STRICT RULES for table format:
 - Do NOT add any sentence before or after the table
 - If the data is empty (0 rows or empty array), respond with one sentence saying no records were found.
 
-
-
-uyfcuwghfikwnfkw ifg89hjw
-fbwtfgyudhiowemkefkjwe
          `,
             input: [
                 {
