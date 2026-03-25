@@ -3,7 +3,7 @@ const cors = require("cors");
 const { isConnectedToDB, runQuery } = require("./services/db.service");
 const { runAi } = require("./services/openai.service");
 
-const { createConversation, saveChat, getHistory, getChatById } = require("./services/historyDb.service");//add
+const { createConversation, saveChat, getHistory, getChatById } = require("./services/chatDb.service");//add
 
 const app = express();
 
@@ -51,7 +51,7 @@ app.post("/api/ask-ai", async (req, res) => {
     });
   }
 
- 
+ //endpoints- /api/new, api/history, /api/ask-ai,
   try {
 
     const result = await runAi(question, conversation_id, conversation_title);

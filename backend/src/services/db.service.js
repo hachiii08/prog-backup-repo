@@ -7,7 +7,6 @@ async function connectToDB() {
     try{
         if (!pool){
             pool = await sql.connect(config); 
-            console.log("Connected to SQL Server");
         }
         return pool;
     }catch(err){
@@ -22,7 +21,6 @@ async function isConnectedToDB() {
     }else{
         try {
             const pool = await connectToDB();
-            console.log("Database connection is working");
             return true;
         } catch (err) {
             console.error("Database connection check failed: ", err);
@@ -49,24 +47,11 @@ async function blockKeywords(query) {
     return true;
 }
 
-//add
-async function InternalQuery(query) {
-    try {
-        const pool = await connectToDB();
-        const result = await pool.request().query(query);
-        return { success: true, data: result.recordset };
-    } catch (err) {
-        return { success: false, message: "Query execution failed", error: err.message };
-    }
-}
-
-
 async function runQuery(query) {
     try {
-        // Validate query
+        
         await blockKeywords(query);
 
-        // Allow SELECT only
         if (!query.trim().toUpperCase().startsWith("SELECT")) {
             throw new Error("Only SELECT queries are allowed.");
         }
@@ -92,5 +77,4 @@ module.exports = {
     isConnectedToDB,
     runQuery,
     blockKeywords,
-    InternalQuery
 };
