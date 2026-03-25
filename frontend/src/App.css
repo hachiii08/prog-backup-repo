@@ -1,0 +1,29 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Poppins', 'Times New Roman', Times, serif;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  color: black;
+  width: calc(100vw - 240px);
+  height: 100vh;
+  background-color: #e0e0e0;
+}
+
+h1, h2 {
+  margin: 0;
+  padding: 0;
+  font-size: 20px;
+}

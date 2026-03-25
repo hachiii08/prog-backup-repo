@@ -1,0 +1,30 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+h4 {
+  font-weight: normal;
+}
+
+.assistant-status {
+  display: flex;
+  align-items: center;
+  gap: 8px; 
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.green {
+  background-color: #4caf50; 
+}
+
+.status-dot.red {
+  background-color: #f44336; 
+}
