@@ -1,28 +1,64 @@
 import { useEffect, useState } from "react";
 import '../styles/Sidebar.css';
 import { FaPlus } from "react-icons/fa6";
+import { FaRegTrashAlt } from "react-icons/fa";
+
 
 function Sidebar({ onNewChat, onSelectConversation }) {
   const [history, setHistory] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   const fetchHistory = async () => {
-    const res = await fetch("/api/history");
-    const data = await res.json();
-    setHistory(Array.isArray(data.data) ? data.data : []);
+    try {
+      const res = await fetch("/api/history");
+      const data = await res.json();
+      setHistory(data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+    }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const handleNewChat = async () => {
+    setSelectedId(null);
     await onNewChat();
     fetchHistory();
   };
 
-  const handleSelect = (id) => {
+  const handleSelect = async (id) => {
     setSelectedId(id);
-    onSelectConversation(id);
+    await onSelectConversation(id);
   };
+
+  const groupedHistory = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sections = {};
+
+    history.forEach((convo, index) => {
+      if (!convo.conversation_title) return;
+
+      const date = new Date(convo.created_at);
+      const convoDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const diffDays = Math.floor((today - convoDate) / (1000 * 60 * 60 * 24));
+
+      let label = "";
+      if (diffDays === 0) label = "Today";
+      else if (diffDays === 1) label = "Yesterday";
+      else label = `${diffDays} days ago`;
+
+      if (!sections[label]) sections[label] = [];
+      sections[label].push({ ...convo, _index: index }); // save index for unique key
+    });
+
+    return sections;
+  };
+
+  const sections = groupedHistory();
 
   return (
     <div className="sidebar">
@@ -35,48 +71,55 @@ function Sidebar({ onNewChat, onSelectConversation }) {
       </button>
 
       <div className="chat-history">
-        {(() => {
-          const now = new Date();
-          const sections = {};
+        {Object.entries(sections).map(([label, convos]) => (
+          <div className="history-section" key={label}>
+            <h3>{label}</h3>
+            {convos.map(convo => (
+              <div
+                key={convo.id || `${convo.conversation_id}-${convo._index}`}
+                className={`chat-item ${selectedId === convo.conversation_id ? 'selected' : ''}`}
+              >
+                <span 
+                  className="chat-title"
+                  onClick={() => handleSelect(convo.conversation_id)}
+                >
+                  {convo.conversation_title || "New Conversation"}
+                </span>
 
-          history.forEach(convo => {
-            if (!convo.conversation_title) return;
-
-            const date = new Date(convo.created_at);
-
-            // CHANGED: strip time from both dates before comparing to fix timezone -1 bug
-            const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const convoDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-            const diffDays = Math.floor((nowDate - convoDate) / (1000 * 60 * 60 * 24));
-
-            let label = "";
-
-            if (diffDays === 0) label = "Today";
-            else if (diffDays === 1) label = "Yesterday";
-            else label = `${diffDays} days ago`;
-
-            if (!sections[label]) sections[label] = [];
-            sections[label].push(convo);
-          });
-
-          return Object.entries(sections).map(([label, convos]) =>
-            convos.length > 0 && (
-              <div className="history-section" key={label}>
-                <h3>{label}</h3>
-                {convos.map(convo => (
-                  <div
-                    key={convo.conversation_id}
-                    className={`chat-item ${selectedId === convo.conversation_id ? 'selected' : ''}`}
-                    onClick={() => handleSelect(convo.conversation_id)}
-                  >
-                    {convo.conversation_title}
-                  </div>
-                ))}
+                <FaRegTrashAlt
+                  className="delete-icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowModal(true);
+                  }}
+                />
               </div>
-            )
-          );
-        })()}
+            ))}
+          </div>
+        ))}
       </div>
+
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Delete Conversation</h3>
+            <p>Are you sure you want to delete this?</p>
+
+            <div className="modal-buttons">
+              <button
+                className="cancel-btn"
+                onClick={() => setShowModal(false)}
+              >
+                Cancel
+              </button>
+
+              <button className="delete-btn">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
