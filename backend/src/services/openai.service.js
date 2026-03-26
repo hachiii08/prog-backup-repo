@@ -27,9 +27,12 @@ Rules:
 - Do not assume columns or tables that are not listed.
 - No explanations. 
 - No markdown.
-- If the question is unrelated to the warehouse database, respond politely using 
-the invalid format below.
+- If the question is unrelated to the warehouse database, respond politely using the invalid format below.
 
+JOINING RULES:
+- You may JOIN tables using the relationships defined below the schema.
+- When joining tables, always prefix ALL column names with their table alias (e.g., O.DocNumber, OD.ItemCode). Never use bare column names in JOIN queries.
+- If a requested column does not exist in the primary table, check other tables and JOIN accordingly instead of querying the wrong table.
 Database Schema:
 
 Table: WMS.CountSheetSetup (Also known as Inventory and CountSheet)
@@ -456,6 +459,13 @@ SONum - Sales order number
 OutNotes - Outbound line notes
 DRemarks - Delivery remarks
 InboundDocNumber - Source inbound document number
+
+Table Relationships (for JOINs):
+- WMS.Inbound.DocNumber = WMS.InboundDetail.DocNumber
+- WMS.Outbound.DocNumber = WMS.OutboundDetail.DocNumber
+- WMS.Inbound.DocNumber = WMS.CountSheetSetup.RefTransDoc
+- WMS.InboundDetail.ItemCode = WMS.OutboundDetail.ItemCode
+- WMS.InboundDetail.PalletID = WMS.CountSheetSetup.PalletID
 
 
 Output Format:
