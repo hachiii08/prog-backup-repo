@@ -3,11 +3,11 @@ import '../styles/Sidebar.css';
 import { FaPlus } from "react-icons/fa6";
 import { FaRegTrashAlt } from "react-icons/fa";
 
-
 function Sidebar({ onNewChat, onSelectConversation }) {
   const [history, setHistory] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
 
   const fetchHistory = async () => {
     try {
@@ -34,6 +34,36 @@ function Sidebar({ onNewChat, onSelectConversation }) {
     await onSelectConversation(id);
   };
 
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    try {
+      const res = await fetch(`/api/delete-convo/${deleteId}`, {
+        method: "DELETE"
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setShowModal(false);
+        setDeleteId(null);
+
+        // refresh list
+        fetchHistory();
+
+        // optional reset selected
+        if (selectedId === deleteId) {
+          setSelectedId(null);
+        }
+      } else {
+        console.error("Delete failed:", data.error);
+      }
+
+    } catch (err) {
+      console.error("Error deleting:", err);
+    }
+  };
+
   const groupedHistory = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -52,7 +82,7 @@ function Sidebar({ onNewChat, onSelectConversation }) {
       else label = `${diffDays} days ago`;
 
       if (!sections[label]) sections[label] = [];
-      sections[label].push({ ...convo, _index: index }); // save index for unique key
+      sections[label].push({ ...convo, _index: index });
     });
 
     return sections;
@@ -90,6 +120,7 @@ function Sidebar({ onNewChat, onSelectConversation }) {
                   className="delete-icon"
                   onClick={(e) => {
                     e.stopPropagation();
+                    setDeleteId(convo.conversation_id);
                     setShowModal(true);
                   }}
                 />
@@ -108,12 +139,18 @@ function Sidebar({ onNewChat, onSelectConversation }) {
             <div className="modal-buttons">
               <button
                 className="cancel-btn"
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setDeleteId(null); 
+                }}
               >
                 Cancel
               </button>
 
-              <button className="delete-btn">
+              <button 
+                className="delete-btn"
+                onClick={handleDelete}
+              >
                 Delete
               </button>
             </div>

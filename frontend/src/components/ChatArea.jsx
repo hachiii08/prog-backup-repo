@@ -3,6 +3,7 @@ import '../styles/ChatArea.css';
 
 function ChatArea({ conversationId, messages, setMessages, conversationTitle, onTitleUpdate }) {
   const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const lastMessageRef = useRef(null);
 
   const renderMessage = (text) => {
@@ -49,13 +50,16 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isSending) return;
+
+    setIsSending(true);
 
     setMessages(prev => [...prev, { sender: "user", text: input }]);
 
     const typingId = Date.now();
     setMessages(prev => [...prev, { sender: "bot", typing: true, id: typingId }]);
 
+    const userInput = input;
     setInput("");
 
     try {
@@ -63,16 +67,14 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: input,
+          question: userInput,
           conversation_id: conversationId,
           conversation_title: conversationTitle === "New Conversation" ? null : conversationTitle
-})
-        
+        })
       });
 
       const data = await res.json();
 
-      // update header title if backend returned one
       if (data.title) {
         onTitleUpdate(data.title);
       }
@@ -93,6 +95,8 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
             : msg
         )
       );
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -135,13 +139,13 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
       </div>
 
       <div className="chat-chips">
-        <button className="chips" onClick={() => setInput("How many inbound today?")}>
+        <button className="chips" onClick={() => setInput("How many inbound today?")} disabled={isSending}>
           Inbound
         </button>
-        <button className="chips" onClick={() => setInput("How many outbound today?")}>
+        <button className="chips" onClick={() => setInput("How many outbound today?")} disabled={isSending}>
           Outbound
         </button>
-        <button className="chips" onClick={() => setInput("How many countsheetsetup today?")}>
+        <button className="chips" onClick={() => setInput("How many countsheetsetup today?")} disabled={isSending}>
           Inventory
         </button>
       </div>
@@ -154,8 +158,9 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          disabled={isSending}
         />
-        <button className="send-btn" onClick={handleSend}>
+        <button className="send-btn" onClick={handleSend} disabled={isSending}>
           <span>➤</span>
         </button>
       </div>
