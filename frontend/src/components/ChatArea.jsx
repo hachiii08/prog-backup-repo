@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import '../styles/ChatArea.css';
 
-function ChatArea({ conversationId, messages, setMessages, conversationTitle, onTitleUpdate }) {
+// CHANGE: added onNewMessage to props
+function ChatArea({ conversationId, messages, setMessages, conversationTitle, onTitleUpdate, onNewMessage }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const lastMessageRef = useRef(null);
@@ -75,8 +76,14 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
 
       const data = await res.json();
 
+      // CHANGE: on first message (title returned), wait 300ms before refreshing sidebar
+      // so DB has time to save the title before fetchHistory is called
       if (data.title) {
         onTitleUpdate(data.title);
+        setTimeout(() => onNewMessage?.(), 300);
+      } else {
+        // CHANGE: on follow-up messages, refresh immediately
+        onNewMessage?.();
       }
 
       setMessages(prev =>

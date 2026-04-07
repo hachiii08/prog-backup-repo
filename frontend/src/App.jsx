@@ -11,8 +11,11 @@ function ChatApp() {
   const [conversationTitle, setConversationTitle] = useState("New Conversation");
   const [messages, setMessages] = useState([]);
 
+  // CHANGE: use useState 
+  const [sidebarRefresh, setSidebarRefresh] = useState(null);
+
   const navigate = useNavigate();
-  const { conversationId: urlId } = useParams(); // reads /chat/:conversationId from URL
+  const { conversationId: urlId } = useParams();
 
   useEffect(() => {
     fetch("/api/test-connection")
@@ -21,7 +24,6 @@ function ChatApp() {
       .catch(() => setIsConnected(false));
 
     if (urlId) {
-      // URL has a conversation ID — load it directly
       loadConversation(urlId);
     } else {
       const savedId = localStorage.getItem("conversationId");
@@ -31,7 +33,7 @@ function ChatApp() {
         startNewConversation();
       }
     }
-  }, [urlId]); // re-run if URL changes
+  }, [urlId]);
 
   const startNewConversation = async () => {
     const res = await fetch("/api/new", { method: "POST" });
@@ -40,7 +42,7 @@ function ChatApp() {
     setConversationTitle("New Conversation");
     localStorage.setItem("conversationId", data.conversation_id);
     setMessages([]);
-    navigate("/"); // clear URL on new chat
+    navigate("/");
   };
 
   const loadConversation = async (id) => {
@@ -56,20 +58,30 @@ function ChatApp() {
       { sender: "user", text: row.user_question },
       { sender: "bot", text: row.ai_response || row.error_message || "" }
     ]));
-    navigate(`/chat/${id}`); // update URL to show conversation UUID
+    navigate(`/chat/${id}`);
   };
 
   return (
     <div className="app-container">
-      <Sidebar onNewChat={startNewConversation} onSelectConversation={loadConversation} />
+
+      {/* CHANGE: onRefreshReady now sets state instead of a ref */}
+      <Sidebar
+        onNewChat={startNewConversation}
+        onSelectConversation={loadConversation}
+        onRefreshReady={(fn) => setSidebarRefresh(() => fn)}
+      />
+
       <div className="main-content">
         <Header isConnected={isConnected} conversationTitle={conversationTitle} />
+
+        {/* CHANGE: onNewMessage now calls sidebarRefresh from state */}
         <ChatArea
           conversationId={conversationId}
           messages={messages}
           setMessages={setMessages}
           conversationTitle={conversationTitle}
           onTitleUpdate={setConversationTitle}
+          onNewMessage={() => sidebarRefresh?.()}
         />
       </div>
     </div>

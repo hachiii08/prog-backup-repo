@@ -3,7 +3,7 @@ import '../styles/Sidebar.css';
 import { FaPlus } from "react-icons/fa6";
 import { FaRegTrashAlt } from "react-icons/fa";
 
-function Sidebar({ onNewChat, onSelectConversation }) {
+function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) { // added onRefreshReady
   const [history, setHistory] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -21,7 +21,8 @@ function Sidebar({ onNewChat, onSelectConversation }) {
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+    if (onRefreshReady) onRefreshReady(fetchHistory);  // ← add this line
+}, []);
 
   const handleNewChat = async () => {
     setSelectedId(null);
