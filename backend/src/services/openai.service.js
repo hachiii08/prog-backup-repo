@@ -1,18 +1,28 @@
 require('dotenv').config();
 const OpenAI = require('openai');
 const { runQuery } = require("../services/db.service");
-const { getConversationTitle } = require("../services/chatDb.service");
+const { getConversationTitle, getChatById } = require("../services/chatDb.service");
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-async function generateSQL(question) {
+async function generateSQL(question, conversationHistory = []) {
     try {
+        // CHANGE: build input with conversation history for session memory
+        const historyContext = conversationHistory.length > 0
+            ? conversationHistory.map(row => 
+                `User: ${row.user_question}\nAssistant: ${row.ai_response || ''}`
+              ).join('\n\n')
+            : null;
+
+        const fullInput = historyContext
+            ? `Previous conversation:\n${historyContext}\n\nCurrent question: ${question}`
+            : question;
+
         const response = await openai.responses.create({
             model: 'gpt-4o-mini',
-            instructions: // Replace the instructions string inside your generateSQL function with this:
-
+            instructions:
 `
 You are a SQL assistant for a Warehouse Management System (WMS) used by a cold storage company.
 
@@ -26,13 +36,18 @@ CONTEXT INTERPRETATION — Before generating SQL, identify what the user is real
 - HOW MANY = COUNT or SUM aggregation
 - SHOW / LIST = SELECT TOP 10 query
 
+CONVERSATION MEMORY — You may receive previous conversation history. Use it to:
+- Understand follow-up questions like "show me more of those" or "filter by that customer"
+- Carry forward context like document numbers, item codes, or date ranges mentioned earlier
+- Resolve pronouns like "it", "that", "those" using prior context
+
 LANGUAGE MAPPING — Map these common user terms to the correct table/column:
 - "stock", "inventory", "items on hand", "on-hand"         → WMS.CountSheetSetup
 - "receiving", "arrivals", "deliveries in", "ICN"           → WMS.Inbound
 - "dispatch", "releasing", "deliveries out", "OCN"          → WMS.Outbound
 - "received items", "inbound items", "ICN line items"        → WMS.InboundDetail
 - "dispatched items", "outbound items", "OCN line items"     → WMS.OutboundDetail
-- "client", "company", "account"                            → CustomerCode (Inbound) or Customer (Outbound/OutboundDetail)
+- "client", "company", "account"                            → CustomerCode (Inbound) or Customer (Outbound/OutboundDetail) or CustomerC (CountSheetSetup)
 - "product", "SKU", "item", "goods"                         → ItemCode column
 - "expiry", "expiration", "expires"                         → ExpirationDate (CountSheetSetup) or ExpiryDate (InboundDetail/OutboundDetail)
 - "location", "bin", "where is", "aisle"                    → Location column
@@ -501,19 +516,19 @@ Table Relationships (for JOINs):
 - WMS.InboundDetail.ItemCode = WMS.OutboundDetail.ItemCode
 - WMS.InboundDetail.PalletID = WMS.CountSheetSetup.PalletID
 
-        Output Format:
+Output Format:
 
-        If valid question:
-        {
-        "query": "SQL query here"
-        }
+If valid question:
+{
+"query": "SQL query here"
+}
 
-        If invalid question:
-        {
-            "message": "Give a friendly, conversational reply when no data is available or the question doesn't make sense."
-        }
-        `,
-            input: question
+If invalid question: (sample output)
+{
+    "message": "[(Be friendly) conversational reply here based on what the user asked]"
+}
+`,
+            input: fullInput  // CHANGE: send history + question instead of just question
         });
 
         const responseText = response.output_text.trim();
@@ -664,7 +679,11 @@ async function runAi(question, conversation_id, conversation_title) {
             convoId = await require("./chatDb.service").createConversation();
         }
 
-        const generatedSqlOutput = await generateSQL(question);
+        // CHANGE: fetch conversation history for session memory
+        const conversationHistory = convoId ? await getChatById(convoId) : [];
+
+        // CHANGE: pass history into generateSQL
+        const generatedSqlOutput = await generateSQL(question, conversationHistory);
 
         if (!generatedSqlOutput || !generatedSqlOutput.query) {
             return {
@@ -672,10 +691,12 @@ async function runAi(question, conversation_id, conversation_title) {
                 sql: null,
                 title: conversation_title,
                 data: generatedSqlOutput?.message,
-                error: "SQL generation failed"
+                error: "SQL generation failed",
+                executionTimeMs: null  // CHANGE: no execution time for non-SQL replies
             };
         }
 
+        // CHANGE: runQuery now returns executionTimeMs
         const results = await runQuery(generatedSqlOutput.query);
 
         if (!results.success) {
@@ -684,7 +705,8 @@ async function runAi(question, conversation_id, conversation_title) {
                 sql: generatedSqlOutput.query,
                 title: conversation_title,
                 data: "Cannot run the query. Try again.",
-                error: results.error
+                error: results.error,
+                executionTimeMs: null
             };
         }
 
@@ -705,7 +727,8 @@ async function runAi(question, conversation_id, conversation_title) {
             success: true,
             title: conversation_title,
             conversation_id: convoId,
-            data: formatted
+            data: formatted,
+            executionTimeMs: results.executionTimeMs  // CHANGE: pass execution time to caller
         };
 
     } catch (err) {
@@ -714,7 +737,8 @@ async function runAi(question, conversation_id, conversation_title) {
             sql: null,
             title: conversation_title || null,
             data: null,
-            error: err.message || "Failed to run AI process"
+            error: err.message || "Failed to run AI process",
+            executionTimeMs: null
         };
     }
 }

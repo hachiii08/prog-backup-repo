@@ -3,7 +3,7 @@ import '../styles/Sidebar.css';
 import { FaPlus } from "react-icons/fa6";
 import { FaRegTrashAlt } from "react-icons/fa";
 
-function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) { // added onRefreshReady
+function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) {
   const [history, setHistory] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -21,8 +21,8 @@ function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) { // added
 
   useEffect(() => {
     fetchHistory();
-    if (onRefreshReady) onRefreshReady(fetchHistory);  // ← add this line
-}, []);
+    if (onRefreshReady) onRefreshReady(fetchHistory);
+  }, []);
 
   const handleNewChat = async () => {
     setSelectedId(null);
@@ -48,11 +48,8 @@ function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) { // added
       if (data.success) {
         setShowModal(false);
         setDeleteId(null);
-
-        // refresh list
         fetchHistory();
 
-        // optional reset selected
         if (selectedId === deleteId) {
           setSelectedId(null);
         }
@@ -110,7 +107,7 @@ function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) { // added
                 key={convo.id || `${convo.conversation_id}-${convo._index}`}
                 className={`chat-item ${selectedId === convo.conversation_id ? 'selected' : ''}`}
               >
-                <span 
+                <span
                   className="chat-title"
                   onClick={() => handleSelect(convo.conversation_id)}
                 >
@@ -142,13 +139,13 @@ function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) { // added
                 className="cancel-btn"
                 onClick={() => {
                   setShowModal(false);
-                  setDeleteId(null); 
+                  setDeleteId(null);
                 }}
               >
                 Cancel
               </button>
 
-              <button 
+              <button
                 className="delete-btn"
                 onClick={handleDelete}
               >

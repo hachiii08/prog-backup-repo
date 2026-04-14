@@ -38,7 +38,6 @@
 .message.bot {
   justify-content: flex-start;
   align-items: flex-start;
- 
 }
 
 .message.user {
@@ -135,6 +134,7 @@
   border-color: #b0b0b0;
 }
 
+/* CHANGE: added position: relative so char-counter can position inside it */
 .input-container {
   padding: 20px;
   background-color: white;
@@ -142,11 +142,13 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  position: relative;
 }
 
+/* CHANGE: added padding-right so text doesn't go under the counter */
 .message-input {
   flex: 1;
-  padding: 14px 20px;
+  padding: 14px 70px 14px 20px;
   border: 1px solid #2d2d2d;
   border-radius: 10px;
   font-size: 15px;
@@ -163,6 +165,11 @@
 
 .message-input:focus {
   border-color: #666;
+}
+
+/* CHANGE: red border when over limit */
+.message-input.over-limit {
+  border-color: red;
 }
 
 .send-btn {
@@ -183,6 +190,11 @@
 
 .send-btn:hover {
   background-color: #3d3d3d;
+}
+
+.send-btn:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -213,7 +225,7 @@
   width: 10px;
   height: 10px;
   margin-right: 5px;
-  background-color: #3b5998; 
+  background-color: #3b5998;
   border-radius: 50%;
   animation: blink 1.5s infinite both;
 }
@@ -224,12 +236,6 @@
 
 .typing span:nth-child(3) {
   animation-delay: 0.4s;
-}
-
-@keyframes blink {
-  0% { opacity: 0.1; }
-  20% { opacity: 1; }
-  100% { opacity: 0.1; }
 }
 
 @keyframes blink {
@@ -264,7 +270,7 @@
 
 .chips:hover { background: #1a1a1a; color: #fff; }
 
-/*Table*/
+/* Table */
 .table {
   border-collapse: collapse;
   margin-top: 8px;
@@ -285,4 +291,19 @@
 
 .table tr:nth-child(even) {
   background-color: #fafafa;
+}
+
+/* CHANGE: char counter sits inside the input box on the right */
+.char-counter {
+  position: absolute;
+  right: 90px;
+  font-size: 11px;
+  color: #aaa;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.char-counter.over-limit {
+  color: red;
+  font-weight: bold;
 }

@@ -1,10 +1,12 @@
 const { v4: uuidv4 } = require('uuid');
 const { connectToDB } = require('../services/db.service');
+const sql = require('mssql'); //added
 
 const createConversation = () => {
   return uuidv4();
 };
 
+// CHANGE: added executionTimeMs parameter
 const saveChat = async (
   conversationId,
   conversationTitle,
@@ -12,7 +14,8 @@ const saveChat = async (
   generatedSql,
   aiResponse,
   executionStatus,
-  errorMessage
+  errorMessage,
+  executionTimeMs  // CHANGE: new param
 ) => {
   try {
     const pool = await connectToDB();
@@ -25,11 +28,12 @@ const saveChat = async (
       .input('ai_response', aiResponse)
       .input('execution_status', executionStatus)
       .input('error_message', errorMessage)
+      .input('execution_time_ms',sql.Int, executionTimeMs ?? null)  // CHANGE: new input
       .query(`
         INSERT INTO DEV.ChatHistory
-        (conversation_id, conversation_title, user_question, generated_sql, ai_response, execution_status, error_message)
+        (conversation_id, conversation_title, user_question, generated_sql, ai_response, execution_status, error_message, execution_time_ms)
         VALUES
-        (@conversation_id, @conversation_title, @user_question, @generated_sql, @ai_response, @execution_status, @error_message)
+        (@conversation_id, @conversation_title, @user_question, @generated_sql, @ai_response, @execution_status, @error_message, @execution_time_ms)
       `);
 
     return { 
@@ -51,7 +55,7 @@ const getHistory = async () => {
 
     const result = await pool.request().query(`
       SELECT 
-      conversation_id,
+        conversation_id,
         MAX(conversation_title) AS conversation_title,  
         MAX(created_at) AS created_at                  
       FROM DEV.ChatHistory

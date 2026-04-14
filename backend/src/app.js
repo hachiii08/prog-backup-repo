@@ -122,6 +122,7 @@ app.post("/api/ask-ai", async (req, res) => {
     try {
         const result = await runAi(question, conversation_id, conversation_title);
 
+
         await saveChat(
             conversation_id || null,
             result.title || conversation_title || null,
@@ -129,7 +130,8 @@ app.post("/api/ask-ai", async (req, res) => {
             result.sql || null,
             result.data || null,
             result.success ? "success" : "error",
-            result.error || null
+            result.error || null,
+            result.executionTimeMs || null
         );
 
         res.json(result);

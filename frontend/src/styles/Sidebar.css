@@ -79,29 +79,29 @@
 }
 
 .chat-title {
-  flex: 1 1 auto; 
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 8px; 
+  margin-right: 8px;
 }
 
 /* Delete icon */
 .delete-icon {
-  flex: 0 0 auto; 
+  flex: 0 0 auto;
   font-size: 16px;
   color: #888;
   cursor: pointer;
   transition: color 0.2s, opacity 0.2s;
-  opacity: 0; /* hidden by default */
+  opacity: 0;
 }
 
 .chat-item:hover .delete-icon {
-  opacity: 1; /* show on hover */
+  opacity: 1;
 }
 
 .delete-icon:hover {
-  color: #cc4446; 
+  color: #cc4446;
 }
 
 /* Scrollbar styles */

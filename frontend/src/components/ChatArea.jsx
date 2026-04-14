@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import '../styles/ChatArea.css';
 
-// CHANGE: added onNewMessage to props
+const MAX_CHARS = 300;
+
 function ChatArea({ conversationId, messages, setMessages, conversationTitle, onTitleUpdate, onNewMessage }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -51,7 +52,8 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isSending) return;
+    // CHANGE: added input.length > MAX_CHARS check to block oversized input
+    if (!input.trim() || isSending || input.length > MAX_CHARS) return;
 
     setIsSending(true);
 
@@ -76,13 +78,10 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
 
       const data = await res.json();
 
-      // CHANGE: on first message (title returned), wait 300ms before refreshing sidebar
-      // so DB has time to save the title before fetchHistory is called
       if (data.title) {
         onTitleUpdate(data.title);
         setTimeout(() => onNewMessage?.(), 300);
       } else {
-        // CHANGE: on follow-up messages, refresh immediately
         onNewMessage?.();
       }
 
@@ -110,6 +109,9 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
   useEffect(() => {
     lastMessageRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const isOverLimit = input.length > MAX_CHARS;
+  const showCounter = input.length >= MAX_CHARS - 50;
 
   return (
     <div className="chat-area">
@@ -158,16 +160,30 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
       </div>
 
       <div className="input-container">
+        {/* CHANGE: red border when over limit */}
         <input
           type="text"
           placeholder="Send your message"
-          className="message-input"
+          className={`message-input ${isOverLimit ? "over-limit" : ""}`}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          // CHANGE: Enter key now checks length before sending
+          onKeyDown={(e) => e.key === "Enter" && !isSending && !isOverLimit && handleSend()}
           disabled={isSending}
+          maxLength={MAX_CHARS}  //added
         />
-        <button className="send-btn" onClick={handleSend} disabled={isSending}>
+        {/* CHANGE: counter appears within 50 chars of limit, turns red when over */}
+        {showCounter && (
+          <span className={`char-counter ${isOverLimit ? "over-limit" : ""}`}>
+            {input.length}/{MAX_CHARS}
+          </span>
+        )}
+        {/* CHANGE: send button disabled when over limit */}
+        <button
+          className="send-btn"
+          onClick={handleSend}
+          disabled={isSending || isOverLimit}
+        >
           <span>➤</span>
         </button>
       </div>
