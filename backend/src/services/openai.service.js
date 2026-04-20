@@ -7,22 +7,11 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-async function generateSQL(question, conversationHistory = []) {
+async function generateSQL(question) {
     try {
-        // CHANGE: build input with conversation history for session memory
-        const historyContext = conversationHistory.length > 0
-            ? conversationHistory.map(row => 
-                `User: ${row.user_question}\nAssistant: ${row.ai_response || ''}`
-              ).join('\n\n')
-            : null;
-
-        const fullInput = historyContext
-            ? `Previous conversation:\n${historyContext}\n\nCurrent question: ${question}`
-            : question;
-
         const response = await openai.responses.create({
             model: 'gpt-4o-mini',
-            instructions:
+            instructions: //ADDED SOME RULES
 `
 You are a SQL assistant for a Warehouse Management System (WMS) used by a cold storage company.
 
@@ -62,6 +51,14 @@ LANGUAGE MAPPING — Map these common user terms to the correct table/column:
 - "how many"                                                → COUNT(*) or SUM() aggregation
 - "show me", "list", "give me"                              → SELECT TOP 10
 
+FORECASTING QUERIES — When the question involves forecasting or trends:
+- Always use GROUP BY MONTH(DocDate), YEAR(DocDate) to aggregate data
+- Always use COUNT(*) or SUM() to get totals per period
+- Always ORDER BY YEAR(DocDate), MONTH(DocDate) to show chronological trend
+- Fetch at least 3-6 months of historical data to establish a trend
+- Example: SELECT YEAR(DocDate) AS Year, MONTH(DocDate) AS Month, COUNT(*) AS Total FROM WMS.Inbound WHERE DocDate >= DATEADD(MONTH, -6, GETDATE()) GROUP BY YEAR(DocDate), MONTH(DocDate) ORDER BY YEAR(DocDate), MONTH(DocDate)
+
+
 Rules:
 - Only generate SELECT queries.
 - Never use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, MERGE, EXEC.
@@ -69,10 +66,15 @@ Rules:
 - Never use multiple statements.
 - When limiting results, use SELECT TOP 10 (not LIMIT).
 - TOP and DISTINCT cannot be used together. Use only TOP or only DISTINCT, never both.
-- Avoid SELECT *
+- NEVER use SELECT *. Always specify column names explicitly.
+- NEVER use UNION, UNION ALL, INTERSECT, or EXCEPT across tables with different column structures.
+- NEVER assume column names. Only use columns that are explicitly listed in the schema.
+- If the user asks a broad question covering multiple tables (e.g. "all transactions"), default to WMS.Inbound as the primary table. Do not use UNION to combine tables.
+- NEVER invent or shorten column names. DocNumber is DocNumber, not IDocNumber or ID.
+- NEVER select a column called ID — it does not exist in any table.
 - Use only the provided schema.
 - Do not assume columns or tables that are not listed.
-- If a requested column does not exist in the primary table, check other tables and JOIN accordingly.
+- If a requested column does not exist in the primary table, JOIN the related table using the defined relationships below.
 - No explanations.
 - No markdown.
 - If the question is completely unrelated to warehouse operations, respond using the invalid format below.
@@ -103,10 +105,10 @@ RRdate - Receiving report date
 OriginalBulkQty - Bulk quantity when first recorded
 OriginalBaseQty - Base quantity when first recorded
 OriginalLocation - Aisle/bin location before any movement
-RemainingBulkQty - Current available bulk quantity
-RemainingBaseQty - Current available base quantity
-PickedBulkQty - Picked quantity in bulk units
-PickedBaseQty - Picked quantity in base units
+RemainingBulkQty - Current available quantity
+RemainingBaseQty - Current available weight
+PickedBulkQty - Picked available quantity
+PickedBaseQty - Picked available weight
 ReservedBulkQty - Bulk quantity reserved for outbound
 ReservedBaseQty - Base quantity reserved for outbound
 OriginalCost - Item cost at receiving
@@ -179,7 +181,7 @@ PutAwayStrategy - Put-away strategy applied
 IsNoCharge - Free of charge flag
 Packing - Packing type or method
 AssignLoc - Assigned storage zone
-ICNTotalQty - Total quantity received
+ICNTotalQty - Total quantity received (use this, NOT TotalQty)
 AddedBy - Numeric user ID who created the record
 AddedDate - Record creation date
 LastEditedBy - User who last modified the record
@@ -528,7 +530,7 @@ If invalid question: (sample output)
     "message": "[(Be friendly) conversational reply here based on what the user asked]"
 }
 `,
-            input: fullInput  // CHANGE: send history + question instead of just question
+           input: question
         });
 
         const responseText = response.output_text.trim();
@@ -679,11 +681,64 @@ async function runAi(question, conversation_id, conversation_title) {
             convoId = await require("./chatDb.service").createConversation();
         }
 
-        // CHANGE: fetch conversation history for session memory
         const conversationHistory = convoId ? await getChatById(convoId) : [];
 
-        // CHANGE: pass history into generateSQL
-        const generatedSqlOutput = await generateSQL(question, conversationHistory);
+        const historyContext = conversationHistory.length > 0
+            ? conversationHistory.map(row =>
+                `User: ${row.user_question}\nAssistant: ${row.ai_response || ''}`
+              ).join('\n\n')
+            : null;
+
+        const fullInput = historyContext
+            ? `Previous conversation:\n${historyContext}\n\nCurrent question: ${question}`
+            : question;
+
+        // NEW: detect intent
+        const intent = await detectIntent(question);
+
+        // NEW: forecast path
+        if (intent === 'forecast') {
+            const forecastSqlOutput = await generateSQL(fullInput);
+
+            if (!forecastSqlOutput || !forecastSqlOutput.query) {
+                return {
+                    success: true,
+                    sql: null,
+                    title: conversation_title,
+                    conversation_id: convoId,
+                    data: forecastSqlOutput?.message || "I couldn't understand what data to forecast. Try being more specific.",
+                    executionTimeMs: null
+                };
+            }
+            
+const forecastResults = await runQuery(forecastSqlOutput.query);
+
+        if (!forecastResults.success){
+            return {
+                success: false,
+                sql: forecastSqlOutput.query,
+                title: conversation_title,
+                conversation_id: convoId,
+                data: "Could not fetch data for forecasting. Try again.",
+                error: forecastResults.error,
+                executionTimeMs: null
+            };
+        }
+
+        const forecast = await generateForecast(question, forecastResults.data);
+
+        return {
+            success: true,
+            sql: forecastSqlOutput.query,
+            title: conversation_title,
+            conversation_id: convoId,
+            data: forecast,
+            executionTimeMs: forecastResults.executionTimeMs
+        };
+        }
+
+        // DEFAULT: data path — existing flow unchanged
+const generatedSqlOutput = await generateSQL(fullInput);
 
         if (!generatedSqlOutput || !generatedSqlOutput.query) {
             return {
@@ -692,11 +747,10 @@ async function runAi(question, conversation_id, conversation_title) {
                 title: conversation_title,
                 data: generatedSqlOutput?.message,
                 error: "SQL generation failed",
-                executionTimeMs: null  // CHANGE: no execution time for non-SQL replies
+                executionTimeMs: null
             };
         }
 
-        // CHANGE: runQuery now returns executionTimeMs
         const results = await runQuery(generatedSqlOutput.query);
 
         if (!results.success) {
@@ -728,7 +782,7 @@ async function runAi(question, conversation_id, conversation_title) {
             title: conversation_title,
             conversation_id: convoId,
             data: formatted,
-            executionTimeMs: results.executionTimeMs  // CHANGE: pass execution time to caller
+            executionTimeMs: results.executionTimeMs
         };
 
     } catch (err) {
@@ -742,10 +796,93 @@ async function runAi(question, conversation_id, conversation_title) {
         };
     }
 }
+//ADDED TWO FUNCTIONS FOR FORECASTING
+async function detectIntent(question) {
+    try {
+        const response = await openai.responses.create({
+            model: 'gpt-4o-mini',
+            instructions: `
+You are an intent classifier for a Warehouse Management System chatbot.
+Classify the user's question into one of two intents:
 
+- "forecast" → user wants predictions, trends, projections, or estimates for future periods
+- "data"     → user wants to retrieve, view, count, or list existing warehouse records
+
+Rules:
+- Return ONLY a JSON object, nothing else
+- No explanations, no markdown
+- If unsure, default to "data"
+- A question mentioning BOTH past data AND a future period is ALWAYS "forecast"
+- Keywords that signal "forecast": predict, forecast, projection, estimate, expect, next month, next quarter, future, will, trend
+
+Examples:
+- "how many inbound last year?"                                        → { "intent": "data" }
+- "show me outbound for january"                                       → { "intent": "data" }
+- "list inbound documents for AFM"                                     → { "intent": "data" }
+- "forecast inbound for next month"                                    → { "intent": "forecast" }
+- "predict outbound for march 2026"                                    → { "intent": "forecast" }
+- "using data from jan and feb, forecast march"                        → { "intent": "forecast" }
+- "based on this year's data, what will inbound be next month?"        → { "intent": "forecast" }
+- "make a forecasting for march 2026 using jan and feb data"           → { "intent": "forecast" }
+- "what is the trend in inbound this year?"                            → { "intent": "forecast" }
+- "estimate how many outbound next quarter"                            → { "intent": "forecast" }
+
+Output format:
+{ "intent": "data" }
+            `,
+            input: question
+        });
+
+        const result = JSON.parse(response.output_text.trim());
+        return result.intent;
+
+    } catch (err) {
+        return "data";
+    }
+}
+
+async function generateForecast(question, historicalData) {
+
+    try{
+        const response = await openai.responses.create({
+            model: 'gpt-4o-mini',
+            instructions: `
+            You are a warehouse data analyst for cold storage Warehouse Management System.
+
+            Your job is to analyze historical warehouse data and generate a short, clear forecast.
+
+            Rules:
+            - Use ONLY the data provided to make predictions
+            - Do NOT make up numbers that are not supported by the data
+            - Identify  trends (increasing, decreasing, stable) from the data
+            - Project forward based on those trends
+            - Keep the forecast short, clear, and conversational
+            - Plain text only,  no markdown
+            - If the dat is insufficient to forecast, say so honestly
+
+               `,
+            input: `
+            User request: ${question}
+            Historical data:
+            ${JSON.stringify(historicalData)}
+            
+            Based on this data, provide a forecast.
+            `
+        });
+
+        return response.output_text.trim();
+
+    } catch (err) {
+        return "Unable to generate forecast. Try asking again.";
+    }
+}
+
+        //ADDED EXPORTS
 module.exports = { 
     generateSQL, 
     generateTitle,
-    formatSQL, 
+    formatSQL,
+    generateForecast,
+    detectIntent,
     runAi
 };
