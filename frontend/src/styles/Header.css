@@ -1,30 +1,55 @@
 .header {
   display: flex;
-  flex-direction: column;
-  padding: 20px;
+   align-items: center;
+  justify-content: space-between;
+  padding: 18px 25px;
+  border-bottom: 2px solid #f0f0f0;
+  background: #fff;
 }
 
-h4 {
-  font-weight: normal;
+.header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
 }
 
 .assistant-status {
   display: flex;
   align-items: center;
-  gap: 8px; 
+gap: 7px;
+  background: #f7f7f7;
+  border: 1px solid #ebebeb;
+  border-radius: 20px;
+  padding: 5px 12px 5px 8px;
+  flex-shrink: 0;
+}
+
+.assistant-status h4 {
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  margin: 0;
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  display: inline-block;
+  flex-shrink: 0;
 }
 
 .status-dot.green {
-  background-color: #4caf50; 
+  background-color: #4caf50;
+  box-shadow: 0 0 0 2px #e8f5e9;
 }
 
 .status-dot.red {
-  background-color: #f44336; 
+  background-color: #f44336;
+  box-shadow: 0 0 0 2px #ffebee;
 }

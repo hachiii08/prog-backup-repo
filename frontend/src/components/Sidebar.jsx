@@ -1,13 +1,30 @@
 import { useEffect, useState } from "react";
 import '../styles/Sidebar.css';
 import { FaPlus } from "react-icons/fa6";
-import { FaRegTrashAlt } from "react-icons/fa";
+import { AiOutlineDelete } from "react-icons/ai";
+import { PiSidebarSimpleLight } from "react-icons/pi";
 
 function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) {
   const [history, setHistory] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [isOpen, setIsOpen] = useState(true);
+
+  useEffect(() => {
+  const handleResize = () => {
+    if (window.innerWidth <= 768) {
+      setIsOpen(false); // mobile → closed
+    } else {
+      setIsOpen(true); // desktop → open
+    }
+  };
+
+  handleResize(); // run once on load
+  window.addEventListener("resize", handleResize);
+
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
 
   const fetchHistory = async () => {
     try {
@@ -89,13 +106,20 @@ function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) {
   const sections = groupedHistory();
 
   return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <h2>Chat History</h2>
-      </div>
+
+   <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
+    <div className="sidebar-header">
+      <h2>Chat History</h2>
+
+      <PiSidebarSimpleLight 
+        className="toggle-icon"
+        onClick={() => setIsOpen(!isOpen)}
+      />
+    </div>
 
       <button className="new-chat-btn" onClick={handleNewChat}>
-        <FaPlus className="new-chat-icon" /> New chat
+         <FaPlus className="new-chat-icon" />
+        <span>New chat</span>
       </button>
 
       <div className="chat-history">
@@ -114,7 +138,7 @@ function Sidebar({ onNewChat, onSelectConversation, onRefreshReady }) {
                   {convo.conversation_title || "New Conversation"}
                 </span>
 
-                <FaRegTrashAlt
+                <AiOutlineDelete
                   className="delete-icon"
                   onClick={(e) => {
                     e.stopPropagation();

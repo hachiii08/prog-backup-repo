@@ -139,7 +139,7 @@ app.post("/api/ask-ai", async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            error: "AI processing failed"
+            error: "AI is currently unavailable. Please try again later."
         });
     }
 });

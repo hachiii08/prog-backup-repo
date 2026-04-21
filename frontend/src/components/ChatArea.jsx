@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import '../styles/ChatArea.css';
+import { FaWarehouse } from "react-icons/fa6";
 
-const MAX_CHARS = 300;
+const MAX_CHARS = 250;
 
 function ChatArea({ conversationId, messages, setMessages, conversationTitle, onTitleUpdate, onNewMessage }) {
   const [input, setInput] = useState("");
@@ -119,8 +120,13 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="empty-chat">
-            <h2>Hello! I'm your WMS Assistant.<br />How can I help you?</h2>
+          <div className="empty-chat__icon">
+            <FaWarehouse size={22} color="#888" />
           </div>
+          <span>WMS Assistant</span>
+          <h2>How can I help you today?</h2>
+          <p>Ask about inventory, orders, shipments, or warehouse performance.</p>
+        </div>
         ) : (
           messages.map((msg, index) => (
             <div
@@ -160,25 +166,23 @@ function ChatArea({ conversationId, messages, setMessages, conversationTitle, on
       </div>
 
       <div className="input-container">
-        {/* CHANGE: red border when over limit */}
         <input
           type="text"
           placeholder="Send your message"
           className={`message-input ${isOverLimit ? "over-limit" : ""}`}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          // CHANGE: Enter key now checks length before sending
           onKeyDown={(e) => e.key === "Enter" && !isSending && !isOverLimit && handleSend()}
           disabled={isSending}
           maxLength={MAX_CHARS}  //added
         />
-        {/* CHANGE: counter appears within 50 chars of limit, turns red when over */}
+
         {showCounter && (
           <span className={`char-counter ${isOverLimit ? "over-limit" : ""}`}>
             {input.length}/{MAX_CHARS}
           </span>
         )}
-        {/* CHANGE: send button disabled when over limit */}
+
         <button
           className="send-btn"
           onClick={handleSend}

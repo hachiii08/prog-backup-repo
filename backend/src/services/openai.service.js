@@ -538,9 +538,12 @@ If invalid question: (sample output)
         return responseJson;
 
     } catch (err) {
+         console.error("GenerateSQL Error:", err);
+
         return {
             success: false, 
             message: 'GenerateSQL failed', 
+            message: "I'm having trouble converting your question into a database query. Please try again or rephrase.", 
             error: err.message 
         };
     }
@@ -629,12 +632,18 @@ STRICT RULES for table format:
                 }
             ]
         });
-        return response.output_text;
+        return {
+            success: true,
+            data: response.output_text
+        };
 
     } catch (err) {
-        return {
+          console.error("FormatSQL Error:", err);
+
+       return {
             success: false, 
             message: 'FormatSQL failed', 
+            message: "Failed to format results. Please try again.",
             error: err.message 
         };
     }
@@ -650,7 +659,9 @@ Rules
 - Max 4 words
 - Based on user question
 - No punctuation or quotes
-Return only the title
+- Return only the title
+- Make it natural and readable
+- Based on user intent
             `,
             input: question
         });
@@ -658,6 +669,8 @@ Return only the title
         return response.output_text.trim();
 
     } catch (err) {
+          console.error("GenerateTitle Error:", err);
+
         return "New Conversation";
     }
 }
@@ -681,6 +694,7 @@ async function runAi(question, conversation_id, conversation_title) {
             convoId = await require("./chatDb.service").createConversation();
         }
 
+        //session memory
         const conversationHistory = convoId ? await getChatById(convoId) : [];
 
         const historyContext = conversationHistory.length > 0
@@ -745,7 +759,7 @@ const generatedSqlOutput = await generateSQL(fullInput);
                 success: false,
                 sql: null,
                 title: conversation_title,
-                data: generatedSqlOutput?.message,
+                 data: generatedSqlOutput?.message || "Unable to generate SQL from your question.",
                 error: "SQL generation failed",
                 executionTimeMs: null
             };
@@ -759,7 +773,7 @@ const generatedSqlOutput = await generateSQL(fullInput);
                 sql: generatedSqlOutput.query,
                 title: conversation_title,
                 data: "Cannot run the query. Try again.",
-                error: results.error,
+                error: "Database execution failed",
                 executionTimeMs: null
             };
         }
@@ -791,7 +805,7 @@ const generatedSqlOutput = await generateSQL(fullInput);
             sql: null,
             title: conversation_title || null,
             data: null,
-            error: err.message || "Failed to run AI process",
+            error: "Something went wrong. Please try again.",
             executionTimeMs: null
         };
     }

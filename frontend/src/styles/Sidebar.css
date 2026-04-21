@@ -1,38 +1,108 @@
-/* Sidebar main styles */
+
 .sidebar {
-  color: black;
   width: 240px;
   height: 100vh;
-  background-color: #f0f0f0;
-  padding: 20px;
+  background-color: #fafafa;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e0e0e0;
+  border-right: 2px solid #f0f0f0;
+  transition: width 0.25s ease;
 }
 
-.sidebar-header h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 20px;
+/* HEADER */
+.sidebar-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin: 4px 4px 16px;
+}
+
+/* toggle icon */
+.toggle-icon {
+  font-size: 23px;
+  cursor: pointer;
+}
+
+/* HEADER TITLE */
+.sidebar-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #666;
 }
 
 .new-chat-btn {
   width: 100%;
-  padding: 12px;
-  background-color: #2d2d2d;
-  font-family: 'Poppins';
-  color: white;
+  padding: 10px 14px;
+  background: #1a1a1a;
+  color: #fff;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Poppins';
   cursor: pointer;
   margin-bottom: 20px;
-  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s;
 }
 
 .new-chat-btn:hover {
-  background-color: #3d3d3d;
+  background: #333;
+}
+
+.new-chat-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* CHAT HISTORY */
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* collapsed sidebar */
+.sidebar.closed {
+  width: 70px;
+}
+
+/* hide chat history */
+.sidebar.closed .chat-history {
+  display: none;
+}
+
+/* hide text elements only inside sidebar header */
+.sidebar.closed .sidebar-header h2,
+.sidebar.closed .new-chat-btn span {
+  display: none;
+}
+
+/* center new chat button when collapsed */
+.sidebar.closed .new-chat-btn {
+  justify-content: center;
+  width: 80%;
+}
+
+/* slightly bigger icon when collapsed */
+.sidebar.closed .new-chat-icon {
+  font-size: 14px;
+}
+
+.sidebar.closed .toggle-icon {
+  font-size: 23px;
+}
+
+/* safe chat item centering */
+.sidebar.closed .chat-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .chat-history {
@@ -45,55 +115,53 @@
 }
 
 .history-section h3 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #666;
-  margin-bottom: 8px;
-  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 8px 6px;
 }
 
-/* Chat item layout */
+
 .chat-item {
   display: flex;
-  justify-content: space-between;
+  
   align-items: center;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: #333;
-  cursor: pointer;
-  border-radius: 6px;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: background-color 0.2s;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #444;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  transition: background 0.15s;
 }
 
 .chat-item:hover {
-  background-color: #e8e8e8;
+   background: #f0f0f0;
 }
 
 .chat-item.selected {
-  background-color: #ccc;
-  color: black;
+  background: #ebebeb;
+  color: #1a1a1a;
 }
 
 .chat-title {
-  flex: 1 1 auto;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 8px;
+   margin-right: 6px;
+  font-size: 14px;
 }
 
-/* Delete icon */
+
 .delete-icon {
-  flex: 0 0 auto;
-  font-size: 16px;
-  color: #888;
+ flex-shrink: 0;
+  font-size: 17px;
+  color: #666;
   cursor: pointer;
-  transition: color 0.2s, opacity 0.2s;
   opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
 }
 
 .chat-item:hover .delete-icon {
@@ -101,12 +169,12 @@
 }
 
 .delete-icon:hover {
-  color: #cc4446;
+  color: #e53935;
 }
 
 /* Scrollbar styles */
 .chat-history::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .chat-history::-webkit-scrollbar-track {
@@ -114,52 +182,53 @@
 }
 
 .chat-history::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 3px;
+  background: #e0e0e0;
+  border-radius: 4px;
 }
 
 .chat-history::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: #bbb;
 }
 
-/* Modal */
+
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.4);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 999;
+  backdrop-filter: blur(2px);
 }
 
 .modal {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  width: 300px;
+  background: #fff;
+  padding: 24px;
+  border-radius: 14px;
+  width: 280px;
   text-align: center;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  border: 1px solid #efefef;
 }
 
 .modal h3 {
-  margin-bottom: 10px;
+   font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 8px;
 }
 
 .modal p {
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 20px;
+  font-size: 13px;
+  color: #999;
+  margin: 0 0 20px;
+  line-height: 1.6;
 }
 
-/* Buttons */
+
 .modal-buttons {
   display: flex;
-  justify-content: space-between;
-  font-family: 'Poppins';
+  gap: 8px;
 }
 
 .cancel-btn {
@@ -171,20 +240,47 @@
   border-radius: 6px;
   cursor: pointer;
   font-family: 'Poppins';
+   transition: background 0.15s;
+}
+
+.cancel-btn:hover {
+  background: #f5f5f5;
 }
 
 .delete-btn {
   flex: 1;
-  margin-left: 8px;
-  padding: 8px;
+  padding: 9px;
   border: none;
-  background: #ff4d4f;
-  color: white;
-  border-radius: 6px;
+  background: #1a1a1a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   font-family: 'Poppins';
+  transition: background 0.15s;
 }
 
 .delete-btn:hover {
-  background: #e60023;
+   background: #e53935;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    height: 100vh;
+  }
+
+  /* optional overlay feel */
+  .sidebar.closed {
+    transform: translateX(-100%);
+    width: 240px; /* keep original for slide effect */
+  }
+
+  .sidebar {
+    transition: transform 0.3s ease;
+  }
 }
