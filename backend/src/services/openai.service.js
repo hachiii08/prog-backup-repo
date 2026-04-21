@@ -542,7 +542,6 @@ If invalid question: (sample output)
 
         return {
             success: false, 
-            message: 'GenerateSQL failed', 
             message: "I'm having trouble converting your question into a database query. Please try again or rephrase.", 
             error: err.message 
         };
@@ -632,17 +631,13 @@ STRICT RULES for table format:
                 }
             ]
         });
-        return {
-            success: true,
-            data: response.output_text
-        };
+       return response.output_text;
 
     } catch (err) {
           console.error("FormatSQL Error:", err);
 
        return {
             success: false, 
-            message: 'FormatSQL failed', 
             message: "Failed to format results. Please try again.",
             error: err.message 
         };
@@ -675,6 +670,87 @@ Rules
     }
 }
 
+//ADDED TWO FUNCTIONS FOR FORECASTING
+async function detectIntent(question) {
+    try {
+        const response = await openai.responses.create({
+            model: 'gpt-4o-mini',
+           instructions: `
+You are an intent classifier for a Warehouse Management System chatbot.
+
+Your ONLY job is to read the user's message and classify it into one of two intents:
+- "forecast"
+- "data"
+
+HOW TO CLASSIFY:
+
+Ask yourself one question: "Is the user trying to know about something that has NOT happened yet?"
+
+- YES → "forecast"
+- NO  → "data"
+
+A "forecast" intent means the user wants the system to predict, project, or estimate future warehouse activity based on past patterns. The key signal is always a FUTURE TIME PERIOD or a request to ANALYZE TRENDS for the purpose of prediction.
+
+A "data" intent means everything else — retrieving existing records, counting past transactions, asking conversational questions, greetings, follow-ups, or asking about what the system previously did.
+
+STRICT OUTPUT RULES:
+- Return ONLY a valid JSON object
+- No explanations, no markdown, no extra text
+- Never return anything outside of these two options:
+  { "intent": "forecast" }
+  { "intent": "data" }
+- If genuinely unsure, default to { "intent": "data" }
+
+Output format:
+{ "intent": "data" }
+`,
+            input: question
+        });
+
+        const result = JSON.parse(response.output_text.trim());
+        return result.intent;
+
+    } catch (err) {
+        return "data";
+    }
+}
+
+async function generateForecast(question, historicalData) {
+
+    try{
+        const response = await openai.responses.create({
+            model: 'gpt-4o-mini',
+            instructions: `
+            You are a warehouse data analyst for cold storage Warehouse Management System.
+
+            Your job is to analyze historical warehouse data and generate a short, clear forecast.
+
+            Rules:
+            - Use ONLY the data provided to make predictions
+            - Do NOT make up numbers that are not supported by the data
+            - Identify  trends (increasing, decreasing, stable) from the data
+            - Project forward based on those trends
+            - Keep the forecast short, clear, and conversational
+            - Plain text only,  no markdown
+            - If the dat is insufficient to forecast, say so honestly
+
+               `,
+            input: `
+            User request: ${question}
+            Historical data:
+            ${JSON.stringify(historicalData)}
+            
+            Based on this data, provide a forecast.
+            `
+        });
+
+        return response.output_text.trim();
+
+    } catch (err) {
+        return "Unable to generate forecast. Try asking again.";
+    }
+}
+
 async function runAi(question, conversation_id, conversation_title) {
     try {
         let convoId = conversation_id;
@@ -699,7 +775,7 @@ async function runAi(question, conversation_id, conversation_title) {
 
         const historyContext = conversationHistory.length > 0
             ? conversationHistory.map(row =>
-                `User: ${row.user_question}\nAssistant: ${row.ai_response || ''}`
+            `User: ${row.user_question}\nSQL: ${row.generated_sql || 'none'}\nAssistant: ${row.ai_response || ''}`
               ).join('\n\n')
             : null;
 
@@ -708,7 +784,7 @@ async function runAi(question, conversation_id, conversation_title) {
             : question;
 
         // NEW: detect intent
-        const intent = await detectIntent(question);
+        const intent = await detectIntent(fullInput);
 
         // NEW: forecast path
         if (intent === 'forecast') {
@@ -808,86 +884,6 @@ const generatedSqlOutput = await generateSQL(fullInput);
             error: "Something went wrong. Please try again.",
             executionTimeMs: null
         };
-    }
-}
-//ADDED TWO FUNCTIONS FOR FORECASTING
-async function detectIntent(question) {
-    try {
-        const response = await openai.responses.create({
-            model: 'gpt-4o-mini',
-            instructions: `
-You are an intent classifier for a Warehouse Management System chatbot.
-Classify the user's question into one of two intents:
-
-- "forecast" → user wants predictions, trends, projections, or estimates for future periods
-- "data"     → user wants to retrieve, view, count, or list existing warehouse records
-
-Rules:
-- Return ONLY a JSON object, nothing else
-- No explanations, no markdown
-- If unsure, default to "data"
-- A question mentioning BOTH past data AND a future period is ALWAYS "forecast"
-- Keywords that signal "forecast": predict, forecast, projection, estimate, expect, next month, next quarter, future, will, trend
-
-Examples:
-- "how many inbound last year?"                                        → { "intent": "data" }
-- "show me outbound for january"                                       → { "intent": "data" }
-- "list inbound documents for AFM"                                     → { "intent": "data" }
-- "forecast inbound for next month"                                    → { "intent": "forecast" }
-- "predict outbound for march 2026"                                    → { "intent": "forecast" }
-- "using data from jan and feb, forecast march"                        → { "intent": "forecast" }
-- "based on this year's data, what will inbound be next month?"        → { "intent": "forecast" }
-- "make a forecasting for march 2026 using jan and feb data"           → { "intent": "forecast" }
-- "what is the trend in inbound this year?"                            → { "intent": "forecast" }
-- "estimate how many outbound next quarter"                            → { "intent": "forecast" }
-
-Output format:
-{ "intent": "data" }
-            `,
-            input: question
-        });
-
-        const result = JSON.parse(response.output_text.trim());
-        return result.intent;
-
-    } catch (err) {
-        return "data";
-    }
-}
-
-async function generateForecast(question, historicalData) {
-
-    try{
-        const response = await openai.responses.create({
-            model: 'gpt-4o-mini',
-            instructions: `
-            You are a warehouse data analyst for cold storage Warehouse Management System.
-
-            Your job is to analyze historical warehouse data and generate a short, clear forecast.
-
-            Rules:
-            - Use ONLY the data provided to make predictions
-            - Do NOT make up numbers that are not supported by the data
-            - Identify  trends (increasing, decreasing, stable) from the data
-            - Project forward based on those trends
-            - Keep the forecast short, clear, and conversational
-            - Plain text only,  no markdown
-            - If the dat is insufficient to forecast, say so honestly
-
-               `,
-            input: `
-            User request: ${question}
-            Historical data:
-            ${JSON.stringify(historicalData)}
-            
-            Based on this data, provide a forecast.
-            `
-        });
-
-        return response.output_text.trim();
-
-    } catch (err) {
-        return "Unable to generate forecast. Try asking again.";
     }
 }
 
