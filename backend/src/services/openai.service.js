@@ -675,7 +675,7 @@ async function detectIntent(question) {
     try {
         const response = await openai.responses.create({
             model: 'gpt-4o-mini',
-           instructions: `
+         instructions: `
 You are an intent classifier for a Warehouse Management System chatbot.
 
 Your ONLY job is to read the user's message and classify it into one of two intents:
@@ -689,7 +689,7 @@ Ask yourself one question: "Is the user trying to know about something that has 
 - YES → "forecast"
 - NO  → "data"
 
-A "forecast" intent means the user wants the system to predict, project, or estimate future warehouse activity based on past patterns. The key signal is always a FUTURE TIME PERIOD or a request to ANALYZE TRENDS for the purpose of prediction.
+A "forecast" intent means the user wants the system to predict, project, or estimate future warehouse activity based on past patterns. The key signal is always a FUTURE TIME PERIOD or a request to ANALYZE TRENDS for the purpose of prediction. If the message contains any future time reference such as "next year", "next month", "next quarter", or any future date, classify as "forecast" regardless of how the question is phrased or what verb is used.
 
 A "data" intent means everything else — retrieving existing records, counting past transactions, asking conversational questions, greetings, follow-ups, or asking about what the system previously did.
 
@@ -699,7 +699,6 @@ STRICT OUTPUT RULES:
 - Never return anything outside of these two options:
   { "intent": "forecast" }
   { "intent": "data" }
-- If genuinely unsure, default to { "intent": "data" }
 
 Output format:
 { "intent": "data" }
@@ -721,20 +720,31 @@ async function generateForecast(question, historicalData) {
         const response = await openai.responses.create({
             model: 'gpt-4o-mini',
             instructions: `
-            You are a warehouse data analyst for cold storage Warehouse Management System.
+            You are a warehouse data analyst for a cold storage Warehouse Management System.
 
             Your job is to analyze historical warehouse data and generate a short, clear forecast.
 
             Rules:
             - Use ONLY the data provided to make predictions
-            - Do NOT make up numbers that are not supported by the data
-            - Identify  trends (increasing, decreasing, stable) from the data
-            - Project forward based on those trends
+            - The forecast scope MUST match exactly what the user asked for — if they asked about a specific customer, warehouse, or item, your forecast must be about that specific scope only
+            - Do NOT broaden the scope beyond what the user specified
+            - Do NOT make up numbers not supported by the data
+            - Identify outliers and anomalies in the data and exclude them from trend calculations
+            - If a data point is drastically lower or higher than surrounding months, flag it as an anomaly and do not base the trend on it
+            - Project forward based on clean trend data only
             - Keep the forecast short, clear, and conversational
-            - Plain text only,  no markdown
-            - If the dat is insufficient to forecast, say so honestly
+            - Plain text only. Absolutely no markdown of any kind.
+            - Do NOT use asterisks, bold, italics, bullet points, dashes, or any markdown symbols.
+            - Do NOT use numbered lists. Write in plain conversational paragraphs only.
+            - If the data is insufficient to forecast, say so honestly and explain why in one simple sentence
+            - If the historical data provided comes from an inventory/stock table rather than transaction records, explain to the user that inventory forecasting is unreliable because the table only reflects current stock levels and not historical trends over time. Suggest they ask about inbound or outbound transaction trends instead for a more meaningful forecast.
 
-               `,
+            Output Format:
+            - Start with a one sentence summary of the overall trend
+            - Then list the forecast per period on separate lines like this:
+            [Month Year]: [predicted range or value] — [one short reason]
+            - End with one sentence about confidence level or data quality
+            `,
             input: `
             User request: ${question}
             Historical data:
@@ -815,7 +825,7 @@ const forecastResults = await runQuery(forecastSqlOutput.query);
             };
         }
 
-        const forecast = await generateForecast(question, forecastResults.data);
+        const forecast = await generateForecast(fullInput, forecastResults.data);
 
         return {
             success: true,
