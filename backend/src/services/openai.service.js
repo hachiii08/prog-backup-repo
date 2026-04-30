@@ -7,15 +7,82 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
+async function generateTitle(question) {
+    try {
+        const response = await openai.responses.create({
+            model: "gpt-4o-mini",
+            instructions: `
+Generate a chat title
+Rules
+- Max 4 words
+- Based on user question
+- No punctuation or quotes
+- Return only the title
+- Make it natural and readable
+- Based on user intent
+            `,
+            input: question
+        });
+
+        return response.output_text.trim();
+
+    } catch (err) {
+        console.error("GenerateTitle Error:", err);
+
+        return "New Conversation";
+    }
+}
+
+async function sessionMemory(convoId) {
+    const conversationHistory = convoId ? await getChatById(convoId) : [];
+
+    const historyContext = conversationHistory    //UPDATED
+        .filter(row => row.execution_status !== 'error')
+        .slice(-10)
+        .map(row => 
+            `User: ${row.user_question}\nSQL: ${row.generated_sql || 'none'}\nAssistant: ${row.ai_response || ''}`
+        ).join('\n\n') || null;
+
+    const today = new Date().toISOString().split('T')[0];
+    const dateContext = `System context: The current date is ${today}. Use this only for relative date references like "today", "this month", or "this year". Do not filter by this date unless the user explicitly asks for today's data.`;
+
+    return historyContext
+        ? `${dateContext}\n\nPrevious conversation:\n${historyContext}\n\nCurrent question:`
+        : `${dateContext}`;
+}
+
 async function generateSQL(question) {
     try {
         const response = await openai.responses.create({
             model: 'gpt-4o-mini',
-            instructions: //ADDED SOME RULES
+            instructions: //ADDED intent rules and changed output format for forecast
 `
 You are a SQL assistant for a Warehouse Management System (WMS) used by a cold storage company.
 
 Your job is to convert natural language questions into SQL SELECT queries.
+
+IMPORTANT:
+Before generating SQL, classify the question as either FORECAST or DATA.
+
+FORECAST — user explicitly wants a PREDICTION or PROJECTION of FUTURE activity:
+- Keywords: predict, forecast, project, estimate, expect, "what will", "how many will", "what do you think next month"
+- Must reference a FUTURE time period AND request a prediction
+
+DATA — everything else, including:
+- Retrieving, listing, counting, or showing existing records
+- Comparing two time periods ("compare January vs February")
+- Asking about trends in past data ("was it higher last month?")
+- Follow-up questions referencing previous results ("show me that", "give me the data")
+- Any question with a specific past or present date range
+- Questions using "compare", "versus", "vs", "difference between"
+- User explicitly says "fetch data", "not a forecast", "just show me", "give me the data"
+
+KEY RULE:
+- A date alone does NOT make something a forecast
+- "Show me inbound in February 2026" → DATA
+- "Compare January vs February 2026" → DATA
+- "Predict inbound for next month" → FORECAST
+- When in doubt, default to DATA
 
 CONTEXT INTERPRETATION — Before generating SQL, identify what the user is really asking:
 - WHO   = customer, staff, driver, checker columns
@@ -51,33 +118,57 @@ LANGUAGE MAPPING — Map these common user terms to the correct table/column:
 - "how many"                                                → COUNT(*) or SUM() aggregation
 - "show me", "list", "give me"                              → SELECT TOP 10
 
-FORECASTING QUERIES — When the question involves forecasting or trends:
-- Always use GROUP BY MONTH(DocDate), YEAR(DocDate) to aggregate data
-- Always use COUNT(*) or SUM() to get totals per period
-- Always ORDER BY YEAR(DocDate), MONTH(DocDate) to show chronological trend
-- Fetch at least 3-6 months of historical data to establish a trend
-- Example: SELECT YEAR(DocDate) AS Year, MONTH(DocDate) AS Month, COUNT(*) AS Total FROM WMS.Inbound WHERE DocDate >= DATEADD(MONTH, -6, GETDATE()) GROUP BY YEAR(DocDate), MONTH(DocDate) ORDER BY YEAR(DocDate), MONTH(DocDate)
+FORECASTING QUERIES RULE
 
+When the question involves forecasting, trends, or future estimation:
 
-Rules:
+- DO NOT query future dates
+- ALWAYS return historical data only (to be used for forecasting)
+
+RULES:
+- Fetch at least 3–6 months of historical data
+//
+- Do NOT use GETDATE() as the anchor for date ranges
+- Instead fetch the most recent available data using ORDER BY DocDate DESC
+- Use this pattern:
+  SELECT TOP 6 YEAR(DocDate) AS Year, MONTH(DocDate) AS Month, COUNT(*) AS Total
+  FROM WMS.Inbound
+  GROUP BY YEAR(DocDate), MONTH(DocDate)
+  ORDER BY YEAR(DocDate) DESC, MONTH(DocDate) DESC
+//
+- Always use aggregation (COUNT(*) or SUM())
+- Always group by YEAR(DocDate), MONTH(DocDate)
+- Always order by YEAR(DocDate), MONTH(DocDate)
+
+OUTPUT REQUIREMENTS:
+- Return ONLY monthly aggregated historical data
+- DO NOT generate predictions or future values
+- DO NOT include explanations or extra text
+
+EXAMPLE:
+SELECT TOP 6 YEAR(DocDate) AS Year, MONTH(DocDate) AS Month, COUNT(*) AS Total
+FROM WMS.Outbound
+GROUP BY YEAR(DocDate), MONTH(DocDate)
+ORDER BY YEAR(DocDate) DESC, MONTH(DocDate) DESC
+
+SQL GENERATION RULES:
 - Only generate SELECT queries.
 - Never use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, MERGE, EXEC.
+- NEVER use UNION, UNION ALL, INTERSECT, or EXCEPT.
 - Use SQL Server syntax only.
-- Never use multiple statements.
-- When limiting results, use SELECT TOP 10 (not LIMIT).
-- TOP and DISTINCT cannot be used together. Use only TOP or only DISTINCT, never both.
-- NEVER use SELECT *. Always specify column names explicitly.
-- NEVER use UNION, UNION ALL, INTERSECT, or EXCEPT across tables with different column structures.
-- NEVER assume column names. Only use columns that are explicitly listed in the schema.
-- If the user asks a broad question covering multiple tables (e.g. "all transactions"), default to WMS.Inbound as the primary table. Do not use UNION to combine tables.
-- NEVER invent or shorten column names. DocNumber is DocNumber, not IDocNumber or ID.
-- NEVER select a column called ID — it does not exist in any table.
+- Generate only ONE query (no multiple statements).
+- ALWAYS use SELECT TOP 10 for listing queries (show, list, give me).
+- ALWAYS use SELECT TOP 10 for any query that uses JOIN, applied once on the outermost query only.
+- Do not use TOP and DISTINCT together.
+- NEVER use SELECT * — always specify column names explicitly.
 - Use only the provided schema.
-- Do not assume columns or tables that are not listed.
-- If a requested column does not exist in the primary table, JOIN the related table using the defined relationships below.
-- No explanations.
-- No markdown.
-- If the question is completely unrelated to warehouse operations, respond using the invalid format below.
+- NEVER assume, invent, or shorten column names.
+- Do not use undefined columns or tables.
+- NEVER use a column named ID.
+- If the query involves multiple tables, use JOIN based on defined relationships.
+- If a required column is not in the main table, JOIN the correct related table.
+- For broad queries (e.g., "all transactions"), default to WMS.Inbound.
+- If the question is unrelated to warehouse operations, follow the invalid response format.
 
 JOINING RULES:
 - You may JOIN tables using the relationships defined below the schema.
@@ -520,14 +611,25 @@ Table Relationships (for JOINs):
 
 Output Format:
 
-If valid question:
+If valid forecast question (prediction, trend, future, next month/year/quarter):
 {
-"query": "SQL query here"
+  "intent": "forecast",
+  "query": "SELECT TOP 6 YEAR(DocDate) AS Year, MONTH(DocDate) AS Month, COUNT(*) AS Total FROM ... GROUP BY ... ORDER BY ...",
+  "forecastMonths": <number of months the user wants to forecast>,
+  "forecastScope": "<specific month(s) or period the user wants forecasted e.g. March 2026, Q2 2026>"
 }
 
-If invalid question: (sample output)
+If valid data question (listing, filtering, counting, retrieving):
 {
-    "message": "[(Be friendly) conversational reply here based on what the user asked]"
+  "intent": "data",
+  "query": "SQL query here"
+}
+
+If invalid question:
+{
+  "intent": "data",
+  "query": null,
+  "message": "[(Be friendly) conversational reply here based on what the user asked]"
 }
 `,
            input: question
@@ -545,7 +647,7 @@ If invalid question: (sample output)
             message: "I'm having trouble converting your question into a database query. Please try again or rephrase.", 
             error: err.message 
         };
-    }
+    } 
 }
 
 async function formatSQL(data, userQuestion) {
@@ -566,58 +668,74 @@ Rules:
 - Do NOT add information that is not in the results
 - Do NOT make assumptions or estimates
 - Do NOT explain what the data means beyond what's shown
-- Keep responses short and concise — use one natural, conversational sentence only for queries that return exactly one column AND one row.
-- Do NOT convert single-column multi-row results into a sentence; they must always be formatted as a table.
 - Do NOT mention SQL, databases, or technical terms
-- Output must be plain text only (NOT Markdown)
+- Output must be plain text only — NOT Markdown, NOT Markdown tables
 
-Output Format:
+---
 
-Single-value / simple result:
-If the query returns exactly one column and one row ONLY, provide one sentence summarizing the data.
+OUTPUT RULES — follow exactly:
 
-Multiple columns or multiple rows (even if only one row):
-If the result contains more than one column OR more than one row, ALWAYS output a table.
-The table must include the exact column names from the database as the header row.
-Never include a sentence above or below the table.
+CASE 1 — Exactly one column AND exactly one row:
+Output a single sentence summarizing the value. No table.
 
-Examples (correct table format):
+CASE 2 — Everything else (more than one column, OR more than one row, OR both):
+Output a plain text table. No sentence before or after the table. No exceptions.
 
-DocDate            | AssignLoc
------------------- | ---------
-2025-09-02         | 2AISLE
+---
 
-DocDate           
------------------- 
-2025-09-02         
-2026-11-05         
+PLAIN TEXT TABLE FORMAT — strict rules:
 
-Invalid Format (DO NOT USE):
+1. First line: column headers, separated by " | "
+2. Second line: separator using dashes, one per column, separated by " | "
+3. Following lines: data rows, one per line, separated by " | "
+4. Include ONLY the first 5 rows of data
+5. Include ONLY the first 5 columns of data
+6. Use exact column names from the data as headers
+7. Align columns using spaces
+8. Strip all time and timezone from dates — output dates as YYYY-MM-DD only
 
-| DocDate            | AssignLoc |
-| ------------------ | --------- |
-| 2025-09-02         | 2AISLE    |
+ABSOLUTE FORMATTING RULES — no exceptions:
+- The FIRST CHARACTER of every single line must NOT be "|"
+- The LAST CHARACTER of every single line must NOT be "|"
+- Every line starts with a column value or column name — never with "|"
+- Every line ends with a column value or column name — never with "|"
+- Do NOT output anything before the table (no title, no sentence, no label)
+- Do NOT output anything after the table (no sentence, no note, no summary)
+- Do NOT wrap the table in Markdown code fences or backticks
+- If a cell value is NULL, empty, or blank, output the word NULL in that cell — never leave a cell empty or blank
 
-| DocDate            |
-| ------------------ | 
-| 2025-09-02         | 
-| 2026-11-05         | 
+---
 
-STRICT RULES for table format:
-- ALWAYS include the column header row first
-- ALWAYS include a separator row after the header using dashes
-- Include ONLY the first 5 rows of data, even if more rows exist
-- Include ONLY the first 5 columns of data, even if more columns exist
-- Use the actual column names from the data as headers
-- Align columns using spaces
-- Use " | " to separate columns
-- The first character of the header line MUST NOT be "|".
-- The last character of any line MUST NOT be "|".
-- NEVER place "|" at the beginning of a line
-- NEVER place "|" at the end of a line
-- All date values must be output as YYYY-MM-DD; strip any time or timezone information.
-- Do NOT convert the table to Markdown
-- Do NOT add any sentence before or after the table
+CORRECT examples:
+
+Example A — one column, one row → sentence only:
+  There are 142 items in stock.
+
+Example B — two columns, multiple rows → plain text table:
+  DocDate            | AssignLoc
+  ------------------ | ---------
+  2025-09-02         | 2AISLE
+  2025-11-05         | 3BRACK
+
+Example C — one column, multiple rows → plain text table:
+  DocDate
+  ------------------
+  2025-09-02
+  2026-11-05
+
+Example D — table with null/empty values → display NULL:
+DocNumber   | DocDate    | AssignLoc
+----------- | ---------- | ---------
+ICN0001054  | 2026-01-03 | NULL
+ICN0001055  | NULL       | 2AISLE
+ICN0001056  | 2026-01-04 | NULL
+
+---
+
+WRONG — never output this format:
+  | DocDate | AssignLoc |
+  |---------|-----------|
+  | 2025-09-02 | 2AISLE |
          `,
             input: [
                 {
@@ -634,275 +752,202 @@ STRICT RULES for table format:
        return response.output_text;
 
     } catch (err) {
-          console.error("FormatSQL Error:", err);
+        console.error("FormatSQL Error:", err);
 
-       return {
+        return {
             success: false, 
             message: "Failed to format results. Please try again.",
             error: err.message 
         };
     }
 }
-
-async function generateTitle(question) {
+//changed forecast prompt
+async function generateForecast(question, historicalData, forecastMonths, forecastScope) {
     try {
-        const response = await openai.responses.create({
-            model: "gpt-4o-mini",
-            instructions: `
-Generate a chat title
-Rules
-- Max 4 words
-- Based on user question
-- No punctuation or quotes
-- Return only the title
-- Make it natural and readable
-- Based on user intent
-            `,
-            input: question
-        });
+        const today = new Date();
+        const currentMonth = today.toLocaleString('default', { month: 'long' });
+        const currentYear = today.getFullYear();
 
-        return response.output_text.trim();
-
-    } catch (err) {
-          console.error("GenerateTitle Error:", err);
-
-        return "New Conversation";
-    }
-}
-
-//ADDED TWO FUNCTIONS FOR FORECASTING
-async function detectIntent(question) {
-    try {
-        const response = await openai.responses.create({
-            model: 'gpt-4o-mini',
-         instructions: `
-You are an intent classifier for a Warehouse Management System chatbot.
-
-Your ONLY job is to read the user's message and classify it into one of two intents:
-- "forecast"
-- "data"
-
-HOW TO CLASSIFY:
-
-Ask yourself one question: "Is the user trying to know about something that has NOT happened yet?"
-
-- YES → "forecast"
-- NO  → "data"
-
-A "forecast" intent means the user wants the system to predict, project, or estimate future warehouse activity based on past patterns. The key signal is always a FUTURE TIME PERIOD or a request to ANALYZE TRENDS for the purpose of prediction. If the message contains any future time reference such as "next year", "next month", "next quarter", or any future date, classify as "forecast" regardless of how the question is phrased or what verb is used.
-
-A "data" intent means everything else — retrieving existing records, counting past transactions, asking conversational questions, greetings, follow-ups, or asking about what the system previously did.
-
-STRICT OUTPUT RULES:
-- Return ONLY a valid JSON object
-- No explanations, no markdown, no extra text
-- Never return anything outside of these two options:
-  { "intent": "forecast" }
-  { "intent": "data" }
-
-Output format:
-{ "intent": "data" }
-`,
-            input: question
-        });
-
-        const result = JSON.parse(response.output_text.trim());
-        return result.intent;
-
-    } catch (err) {
-        return "data";
-    }
-}
-
-async function generateForecast(question, historicalData) {
-
-    try{
         const response = await openai.responses.create({
             model: 'gpt-4o-mini',
             instructions: `
-            You are a warehouse data analyst for a cold storage Warehouse Management System.
+You are a warehouse data analyst for a cold storage Warehouse Management System.
 
-            Your job is to analyze historical warehouse data and generate a short, clear forecast.
+IMPORTANT: Today is ${currentMonth} ${currentYear}.
+- All forecast periods must start from NEXT month after today
+- Do NOT forecast months that have already passed
+- Do NOT forecast the current month
+- Example: if today is April 2026, forecast starts at May 2026
 
-            Rules:
-            - Use ONLY the data provided to make predictions
-            - The forecast scope MUST match exactly what the user asked for — if they asked about a specific customer, warehouse, or item, your forecast must be about that specific scope only
-            - Do NOT broaden the scope beyond what the user specified
-            - Do NOT make up numbers not supported by the data
-            - Identify outliers and anomalies in the data and exclude them from trend calculations
-            - If a data point is drastically lower or higher than surrounding months, flag it as an anomaly and do not base the trend on it
-            - Project forward based on clean trend data only
-            - Keep the forecast short, clear, and conversational
-            - Plain text only. Absolutely no markdown of any kind.
-            - Do NOT use asterisks, bold, italics, bullet points, dashes, or any markdown symbols.
-            - Do NOT use numbered lists. Write in plain conversational paragraphs only.
-            - If the data is insufficient to forecast, say so honestly and explain why in one simple sentence
-            - If the historical data provided comes from an inventory/stock table rather than transaction records, explain to the user that inventory forecasting is unreliable because the table only reflects current stock levels and not historical trends over time. Suggest they ask about inbound or outbound transaction trends instead for a more meaningful forecast.
+Your job is to analyze historical warehouse data and generate a short, clear forecast.
 
-            Output Format:
-            - Start with a one sentence summary of the overall trend
-            - Then list the forecast per period on separate lines like this:
-            [Month Year]: [predicted range or value] — [one short reason]
-            - End with one sentence about confidence level or data quality
+SCOPE RULES:
+- The forecast scope MUST match exactly what the user asked for
+- If the user asked about a specific customer, warehouse, item, or date. forecast that scope only
+- Do NOT broaden the scope beyond what the user specified
+
+DATA QUALITY RULES:
+- Only use valid non-null data points for trend analysis
+- If a data point is drastically lower or higher than surrounding months, flag it as an anomaly and exclude it from trend calculations
+- If a month is missing from the dataset, treat the latest available valid data point as your baseline. Do not assume missing months exist and do not treat them as zero.
+
+FORECASTING DECISION — follow this exactly based on how many valid non-null data points exist:
+
+If 3 or more valid months of data:
+- Forecast normally with specific number ranges based on the trend
+- Confidence Level: High or Medium depending on consistency
+
+If 1 or 2 valid months of data:
+- Forecast a general trend direction only: increasing, decreasing, or stable
+- Do NOT use exact numbers or percentages
+- Begin Trend Summary with: "This forecast is based on limited data and should be treated as a rough estimate only."
+- Confidence Level: Low
+
+If zero valid data points:
+- Skip the Forecast block entirely
+- Replace it with one plain conversational sentence explaining what data was found and why a forecast cannot be made
+- Suggest what the user should ask instead to get better results
+
+INVENTORY TABLE RULE:
+- If the historical data comes from an inventory or stock table rather than transaction records, explain that inventory forecasting is unreliable because it only reflects current stock levels, not historical trends. Suggest asking about inbound or outbound transaction trends instead.
+
+FORMAT RULES:
+- Plain text only. No markdown of any kind.
+- No asterisks, bold, italics, bullet points, dashes, or markdown symbols
+- No numbered lists
+- Write in plain conversational paragraphs only
+
+Output Format:
+Follow this format EXACTLY. Do not add extra text or extra lines.
+
+Forecast Period: <Month–Month Year>
+
+Trend Summary: <1–2 sentences only>
+
+Forecast:
+<Month Year>: <number range or trend direction>
+<Month Year>: <number range or trend direction>
+
+Note: <If data was sufficient (3 or more valid months), write: "Forecast is based on [X] months of historical data." If data was limited (1 or 2 valid months), explain what data was actually used and suggest the user ask for a broader date range for a more accurate forecast.>
+
+Confidence Level: <Low | Medium | High>
             `,
             input: `
-            User request: ${question}
-            Historical data:
-            ${JSON.stringify(historicalData)}
-            
-            Based on this data, provide a forecast.
+User request: ${question}
+Forecast period requested: ${forecastMonths} month(s) — ${forecastScope}
+Historical data:
+${JSON.stringify(historicalData)}
+
+Based on this data, provide a forecast for EXACTLY ${forecastMonths} month(s): ${forecastScope}. Do not forecast any additional periods.
             `
         });
 
         return response.output_text.trim();
 
     } catch (err) {
-        return "Unable to generate forecast. Try asking again.";
+        console.error("Generate Forecast Error:", err);
+        return "Unable to generate a forecast at this time. Please try again.";
     }
 }
 
 async function runAi(question, conversation_id, conversation_title) {
     try {
         let convoId = conversation_id;
-
+        // get existing title
         if (convoId) {
             const existingTitle = await getConversationTitle(convoId);
             if (existingTitle) {
                 conversation_title = existingTitle;
             }
         }
-
+        // generate title if none
         if (!conversation_title) {
             conversation_title = await generateTitle(question);
         }
-
+        // create conversation if none
         if (!convoId) {
             convoId = await require("./chatDb.service").createConversation();
         }
-
-        //session memory
-        const conversationHistory = convoId ? await getChatById(convoId) : [];
-
-        const historyContext = conversationHistory.length > 0
-            ? conversationHistory.map(row =>
-            `User: ${row.user_question}\nSQL: ${row.generated_sql || 'none'}\nAssistant: ${row.ai_response || ''}`
-              ).join('\n\n')
-            : null;
-
-        const fullInput = historyContext
-            ? `Previous conversation:\n${historyContext}\n\nCurrent question: ${question}`
-            : question;
-
-        // NEW: detect intent
-        const intent = await detectIntent(fullInput);
-
-        // NEW: forecast path
-        if (intent === 'forecast') {
-            const forecastSqlOutput = await generateSQL(fullInput);
-
-            if (!forecastSqlOutput || !forecastSqlOutput.query) {
-                return {
-                    success: true,
-                    sql: null,
-                    title: conversation_title,
-                    conversation_id: convoId,
-                    data: forecastSqlOutput?.message || "I couldn't understand what data to forecast. Try being more specific.",
-                    executionTimeMs: null
-                };
-            }
-            
-const forecastResults = await runQuery(forecastSqlOutput.query);
-
-        if (!forecastResults.success){
+        // session memory
+        const memory = await sessionMemory(convoId);
+        const fullInput = `${memory} ${question}`;
+        
+        // generate SQL + intent
+        const sqlOutput = await generateSQL(fullInput);
+        const intent = sqlOutput.intent; // ← added
+        if (!sqlOutput || !sqlOutput.query) {
             return {
-                success: false,
-                sql: forecastSqlOutput.query,
-                title: conversation_title,
-                conversation_id: convoId,
-                data: "Could not fetch data for forecasting. Try again.",
-                error: forecastResults.error,
-                executionTimeMs: null
-            };
-        }
-
-        const forecast = await generateForecast(fullInput, forecastResults.data);
-
-        return {
-            success: true,
-            sql: forecastSqlOutput.query,
-            title: conversation_title,
-            conversation_id: convoId,
-            data: forecast,
-            executionTimeMs: forecastResults.executionTimeMs
-        };
-        }
-
-        // DEFAULT: data path — existing flow unchanged
-const generatedSqlOutput = await generateSQL(fullInput);
-
-        if (!generatedSqlOutput || !generatedSqlOutput.query) {
-            return {
-                success: false,
+                success: true,
                 sql: null,
                 title: conversation_title,
-                 data: generatedSqlOutput?.message || "Unable to generate SQL from your question.",
+                conversation_id: convoId,
+                data: sqlOutput?.message || "Unable to generate SQL from your question.",
                 error: "SQL generation failed",
                 executionTimeMs: null
             };
         }
 
-        const results = await runQuery(generatedSqlOutput.query);
-
+        // get data in db
+        const results = await runQuery(sqlOutput.query);
         if (!results.success) {
             return {
                 success: false,
-                sql: generatedSqlOutput.query,
+                sql: sqlOutput.query,
                 title: conversation_title,
-                data: "Cannot run the query. Try again.",
-                error: "Database execution failed",
+                conversation_id: convoId,
+                data: "I couldn’t retrieve the data. Please try again or rephrase your question.",
+                error: results.error || "Query execution failed",
                 executionTimeMs: null
             };
         }
-
-        const limitedData = results.data.slice(0, 10);
-
-        const cleanedData = limitedData.map(row => {
-            const newRow = {};
-            Object.keys(row).slice(0, 5).forEach(key => {
-                newRow[key] = row[key];
+        // branching
+        if (intent === 'forecast') {
+            // Forecast path
+            const forecast = await generateForecast(fullInput, results.data, sqlOutput.forecastMonths, sqlOutput.forecastScope);//updated to match new params
+            return {
+                success: true,
+                sql: sqlOutput.query,
+                title: conversation_title,
+                conversation_id: convoId,
+                data: forecast,
+                executionTimeMs: results.executionTimeMs
+            };
+        } else {
+            // data path
+            const limitedData = results.data.slice(0, 10);
+            const cleanedData = limitedData.map(row => {
+                const newRow = {};
+                Object.keys(row).slice(0, 5).forEach(key => {
+                    newRow[key] = row[key];
+                });
+                return newRow;
             });
-            return newRow;
-        });
-
-        const formatted = await formatSQL(cleanedData, question);
-
-        return {
-            sql: generatedSqlOutput.query,
-            success: true,
-            title: conversation_title,
-            conversation_id: convoId,
-            data: formatted,
-            executionTimeMs: results.executionTimeMs
-        };
-
+            const formatted = await formatSQL(cleanedData, fullInput);
+            return {
+                success: true,
+                sql: sqlOutput.query,
+                title: conversation_title,
+                conversation_id: convoId,
+                data: formatted,
+                executionTimeMs: results.executionTimeMs
+            };
+        }
     } catch (err) {
         return {
             success: false,
             sql: null,
             title: conversation_title || null,
-            data: null,
-            error: "Something went wrong. Please try again.",
+            data: "Something went wrong. Please try again.",
+            error: err?.message || err,
             executionTimeMs: null
         };
     }
 }
 
-        //ADDED EXPORTS
 module.exports = { 
-    generateSQL, 
     generateTitle,
+    generateSQL, 
     formatSQL,
     generateForecast,
-    detectIntent,
     runAi
 };

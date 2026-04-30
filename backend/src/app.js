@@ -122,7 +122,6 @@ app.post("/api/ask-ai", async (req, res) => {
     try {
         const result = await runAi(question, conversation_id, conversation_title);
 
-
         await saveChat(
             conversation_id || null,
             result.title || conversation_title || null,

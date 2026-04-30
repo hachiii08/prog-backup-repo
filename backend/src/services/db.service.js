@@ -57,19 +57,14 @@ async function runQuery(query) {
         }
 
         const pool = await connectToDB();
-
-        // CHANGE: record start time before query runs
         const startTime = Date.now();
         const result = await pool.request().query(query);
-        // CHANGE: calculate how long the query took in milliseconds
         const executionTimeMs = Date.now() - startTime;
-
-
 
         return {
             success: true,
             data: result.recordset,
-            executionTimeMs // CHANGE: include execution time in result
+            executionTimeMs
         };
     } catch (err) {
         return {
